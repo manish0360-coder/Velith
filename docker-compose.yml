@@ -1,0 +1,19 @@
+# Velith M0 — one service only.
+#
+# The `verifier` service builds the container shell and runs the sanity check
+# INSIDE the container. The host Python is never the source of truth for a
+# verdict (§6). No databases, queues, networks, or additional services exist in
+# M0 — they are introduced by the milestone that first needs them.
+#
+# Run (one command, builds then runs the sanity check to green):
+#   docker compose run --rm --build verifier
+
+services:
+  verifier:
+    build:
+      context: .
+      dockerfile: docker/verifier.Dockerfile
+    image: velith-verifier:m0
+    # Default command runs the sanity suite. Override at the CLI for other
+    # steps, e.g. `docker compose run --rm verifier ruff check .`
+    command: ["pytest", "-q"]
