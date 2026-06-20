@@ -1,0 +1,35 @@
+name: CI
+
+# The fresh-clone-green heartbeat (§2, §11): every push and PR builds the image
+# and runs lint + type + the sanity test through the SAME containerized path as
+# local, gating the build on green. No deployment, publishing, or secrets steps.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: build + lint + type + test (containerized)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build verifier image
+        run: docker compose build verifier
+
+      - name: Lint (ruff check)
+        run: docker compose run --rm verifier ruff check .
+
+      - name: Format check (ruff format --check)
+        run: docker compose run --rm verifier ruff format --check .
+
+      - name: Type check (mypy --strict)
+        run: docker compose run --rm verifier mypy src tests
+
+      - name: Sanity test (pytest inside the container)
+        run: docker compose run --rm verifier pytest -q
