@@ -1,0 +1,32 @@
+# Environment / secrets — only .env.example is committed (M0 §11)
+.env
+.env.*
+!.env.example
+
+# Python bytecode / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+.DS_Store
