@@ -1,0 +1,23 @@
+# Pre-commit hooks for Velith (M0 §5). Lint, format, and type gates enforced
+# mechanically before a commit lands — fast hooks only. Revisions are pinned to
+# match the tool versions in pyproject.toml so local and CI agree.
+#
+# First-time setup (documented in README): `pre-commit install`.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        args: [--strict]
+        files: ^(src|tests)/
+        additional_dependencies:
+          - pydantic==2.9.2
+          - pydantic-settings==2.5.2
