@@ -305,6 +305,34 @@ The value MiniNoetica delivered was the **engineering experience and reusable im
 
 ---
 
+---
+
+## D16 — M1 ratification clarifications (Q1–Q7)
+
+**Status:** Accepted (clarifications). **Date:** 2026-06-22.
+**Scope:** These entries clarify the application of existing decisions (D2, D3, D4, D6, D8, D9, D12, D13) to milestone M1. None supersedes or alters D1–D15; each is a clarification, not a redesign. Where a clarification touches the M0–M10 roadmap acceptance text ratified under D12, it refines wording without changing the ratified substance.
+
+### D16.1 — M1 reproducibility is scoped to the verify→log path
+The roadmap's M1 acceptance ("same seed + temperature 0 → same verdict") is clarified: M1's **blocking** reproducibility criterion is that, **given a recorded proposal (fixed patch), the verify→log path produces the same verdict and the same content hash**. Proposal-level model determinism (seed + temperature 0) is attempted and recorded but is **not** a blocking criterion, because local model generation cannot be honestly guaranteed bit-identical across runs/hardware. This *locates determinism in the verifier*, consistent with and strengthening D3. (Clarifies D12; does not alter D3.)
+
+### D16.2 — M1 orchestration runs in-container; Ollama reached via host
+The M1 spike orchestrator runs **inside the container** (Python 3.12 target, D13), network-enabled, reaching the host Ollama service via `host.docker.internal` (WSL2 + Docker Desktop). The **verdict is produced in-container** (D3/M0 invariant preserved). The host Python (3.10) is never an execution target. Transient network access during the M1 run is an accepted, documented condition; isolating the test-execution step from the network is a later hardening step, not an M1 concern. (Clarifies D13.)
+
+### D16.3 — M1 uses a minimal representative fixture task, not real SWE-bench
+M1 exercises the loop with a **minimal, self-contained fixture task** of the same shape as a SWE-bench task (small repo + hidden test). Real SWE-bench Verified integration is deferred to M4. The fixture is **not a benchmark** and must never be used as the ratifying measurement (D8 held-out discipline is unaffected). (Clarifies D4/D6; does not alter D8.)
+
+### D16.4 — M1 introduces a thin LLM adapter, not routing
+M1 adds a **thin `llm/client.py` adapter** (generate + call metadata) so the proposer depends on a model capability, not on a vendor (D9). Model routing, selection policy, and the cost guard remain out of scope until M5; the adapter must not grow into a routing framework in M1. (Implements D9.)
+
+### D16.5 — D8's non-saturating base-model condition binds from M5, not M1
+The non-saturating base-model methodological condition (D8) governs the **compounding experiment (M5+)**. M1 may use any small local code-capable Ollama model that can emit diff-shaped output; the model and version are recorded in every episode for provenance and swappability. (Clarifies the scope of D8.)
+
+### D16.6 — M1 episode persistence
+Episodes persist to host `./data/episodes/` via a bind mount, gitignored, as an append-only JSONL store. The indexed/queryable store is M3. (Implementation clarification; consistent with I2/observability.)
+
+### D16.7 — M1 verdict taxonomy and the outcome/error distinction
+M1 verdict states are: `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`, `NO_PATCH` (all **logged grounded outcomes**, process exit 0) and `INFRA_ERROR` (the **only** error state, non-zero exit). A test failure is a valid grounded outcome and first-class learning data, never an error. No model judges any verdict (D3). `secondary_passed` is null in M1 (populated at M2) and is not a verdict state. (Operationalizes D2/D3.)
+
 ## Amendment procedure
 
 A ratified decision is changed only by appending a new dated entry that:
