@@ -1,0 +1,1 @@
+Phase 0: Development environment ready (Git, WSL2, Docker, Ollama)
