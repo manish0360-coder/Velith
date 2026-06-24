@@ -30,3 +30,6 @@ htmlcov/
 .vscode/
 *.swp
 .DS_Store
+
+# Generated episode store (M1) — grounded experience data, never tracked (handoff §4.10)
+/data/episodes/

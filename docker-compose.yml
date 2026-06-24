@@ -14,6 +14,17 @@ services:
       context: .
       dockerfile: docker/verifier.Dockerfile
     image: velith-verifier:m0
-    # Default command runs the sanity suite. Override at the CLI for other
-    # steps, e.g. `docker compose run --rm verifier ruff check .`
+    # Episodes written in-container must persist to the host so they survive `--rm`
+    # (M1 spec §13, handoff §4.9). The spike writes to /app/data/episodes/ (the
+    # default settings.episode_path); this bind-mount maps it to ./data/episodes on
+    # the host. The directory is gitignored — it holds generated data, never source.
+    volumes:
+      - ./data/episodes:/app/data/episodes
+    # The spike reaches the host's Ollama via host.docker.internal (D16.2). Docker
+    # Desktop resolves this automatically; the explicit mapping keeps it portable.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Default command runs the sanity suite. Override at the CLI for other steps,
+    # e.g. `docker compose run --rm verifier ruff check .`, or to run the spike:
+    # `docker compose run --rm verifier python -m velith.runner.spike --task <id> --seed 0`.
     command: ["pytest", "-q"]
