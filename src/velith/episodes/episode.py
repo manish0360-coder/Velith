@@ -53,7 +53,7 @@ class VerdictState(str, Enum):
 
 
 # The single fixed ``arm`` value for M1. The field exists for forward-compat with
-# D7's arms (A0–A4); no arm logic is built until M5+ — this is just a constant.
+# D7's arms (A0-A4); no arm logic is built until M5+ - this is just a constant.
 DEFAULT_ARM: Final[str] = "baseline"
 
 # The hash boundary, defined once. Content fields that ARE hashed:
