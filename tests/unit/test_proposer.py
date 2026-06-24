@@ -10,11 +10,14 @@ the same scaffolding. No test in this file touches a real Ollama — CI stays he
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 import pytest
 
+from velith.agent.proposer import Proposal, ProposerAgent
 from velith.llm.client import Completion, ModelUnavailableError, OllamaClient
+from velith.task import Task
 
 
 class _StubTransport:
@@ -83,3 +86,65 @@ def test_malformed_response_raises_model_unavailable() -> None:
     client = OllamaClient(host="http://stub", transport=_StubTransport({"unexpected": "shape"}))
     with pytest.raises(ModelUnavailableError):
         client.generate(prompt="x", model="m", seed=0, temperature=0.0)
+
+
+# --- C6: proposer agent ------------------------------------------------------
+
+_DIFF = "--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-bad\n+good\n"
+_TASK = Task(
+    task_id="t",
+    repo_path=Path("/unused-in-proposer"),
+    prompt="Fix the bug; reply with a unified diff patch only.",
+    hidden_test_command=("python", "-m", "pytest", "-q"),
+)
+
+
+def _proposer_returning(completion_text: str) -> ProposerAgent:
+    """Build a proposer backed by an OllamaClient whose reply is fully canned."""
+    stub = _StubTransport(
+        {
+            "model": "m:tag",
+            "response": completion_text,
+            "prompt_eval_count": 3,
+            "eval_count": 5,
+        }
+    )
+    client = OllamaClient(host="http://stub", transport=stub)
+    return ProposerAgent(client=client, model="m", temperature=0.0)
+
+
+def test_propose_extracts_a_fenced_diff() -> None:
+    proposer = _proposer_returning(f"Here you go:\n```diff\n{_DIFF}```\n")
+    proposal = proposer.propose(_TASK, seed=0)
+
+    assert isinstance(proposal, Proposal)
+    assert proposal.has_patch
+    assert proposal.patch.strip().startswith("--- a/x.py")
+    assert "+good" in proposal.patch
+    # metadata flows through from the completion
+    assert proposal.prompt == _TASK.prompt
+    assert proposal.model == "m"
+    assert proposal.model_version == "m:tag"
+    assert proposal.prompt_tokens == 3
+    assert proposal.completion_tokens == 5
+
+
+def test_propose_extracts_a_raw_unfenced_diff() -> None:
+    proposal = _proposer_returning(_DIFF).propose(_TASK, seed=0)
+    assert proposal.has_patch
+    assert proposal.patch.strip().startswith("--- a/x.py")
+
+
+def test_propose_with_no_diff_returns_no_patch_marker() -> None:
+    proposal = _proposer_returning("I cannot find a bug to fix here.").propose(_TASK, seed=0)
+    assert not proposal.has_patch
+    assert proposal.patch == ""
+
+
+def test_propose_propagates_model_unavailable_rather_than_no_patch() -> None:
+    def boom(url: str, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        raise OSError("ollama down")
+
+    proposer = ProposerAgent(client=OllamaClient(host="http://stub", transport=boom), model="m")
+    with pytest.raises(ModelUnavailableError):
+        proposer.propose(_TASK, seed=0)
