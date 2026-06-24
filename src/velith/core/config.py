@@ -12,6 +12,7 @@ defaulting to something wrong. A misconfigured system refuses to start.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,6 +43,20 @@ class Settings(BaseSettings):
     environment: Environment = "development"
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "json"
+
+    # --- M1 settings (extends M0; M1 spec §4 / handoff §4.8) ---
+    # Ollama reachability and model. The host targets host.docker.internal so the
+    # in-container spike reaches the host's Ollama (D16.2). The model is overridable
+    # via VELITH_OLLAMA_MODEL to whatever the operator has pulled (Q5/D16.5).
+    ollama_host: str = "http://host.docker.internal:11434"
+    ollama_model: str = "qwen2.5-coder"
+    ollama_timeout_seconds: float = 120.0
+
+    # Verifier wall-clock budget for hidden-test execution.
+    verifier_timeout_seconds: float = 60.0
+
+    # Append-only JSONL episode store path (host-mounted + gitignored in C9).
+    episode_path: Path = Path("data/episodes/episodes.jsonl")
 
 
 @lru_cache(maxsize=1)
