@@ -30,6 +30,7 @@ for the episode store path in C2.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
@@ -49,6 +50,18 @@ logger = get_logger(__name__)
 #: Default wall-clock budget for hidden-test execution (seconds). Injected here in
 #: M1; sourced from validated Settings by the orchestrator at C7 (see module note).
 DEFAULT_TIMEOUT_SECONDS: Final[float] = 60.0
+
+# Hidden-test runners print a wall-clock duration (e.g. "1 passed in 0.04s") that
+# varies run to run. It is stripped from the captured output so the verdict — and
+# therefore the episode content hash, which includes verdict_output (M1 spec §9.1.1)
+# — is reproducible for a fixed patch (D16.1). Excluding the volatile timing *fields*
+# from the hash is insufficient if timing also leaks into the hashed output text.
+_DURATION_RE = re.compile(r"in \d+\.\d+s")
+
+
+def _normalize_test_output(text: str) -> str:
+    """Strip non-deterministic timing from captured hidden-test output (D16.1)."""
+    return _DURATION_RE.sub("in <duration>", text)
 
 
 class SandboxExecutionError(Exception):
@@ -148,7 +161,7 @@ class VerifierSandbox:
             raise SandboxExecutionError(f"failed to execute hidden test: {exc}") from exc
 
         state = VerdictState.PASSED if test_proc.returncode == 0 else VerdictState.FAILED
-        output = (test_proc.stdout or "") + (test_proc.stderr or "")
+        output = _normalize_test_output((test_proc.stdout or "") + (test_proc.stderr or ""))
         return self._finish(state, output, task, start)
 
     # --- internals -----------------------------------------------------------

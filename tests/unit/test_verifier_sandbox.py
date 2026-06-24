@@ -11,6 +11,7 @@ raises rather than returning a verdict, and the committed fixture is never touch
 from __future__ import annotations
 
 import difflib
+import re
 from pathlib import Path
 
 import pytest
@@ -103,3 +104,11 @@ def test_verdict_is_immutable_value_object() -> None:
     verdict = Verdict(state=VerdictState.PASSED, output="ok", duration_seconds=0.1)
     assert verdict.state == VerdictState.PASSED
     assert verdict.secondary_passed is None
+
+
+def test_verdict_output_is_timing_normalized() -> None:
+    with VerifierSandbox() as sandbox:
+        verdict = sandbox.verify(_fixture_task(), _patch("a + b"))
+    # The volatile pytest duration must not survive (D16.1: reproducible content hash).
+    assert re.search(r"in \d+\.\d+s", verdict.output) is None
+    assert "in <duration>" in verdict.output
