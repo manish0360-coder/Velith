@@ -217,7 +217,12 @@ class VerifierSandbox:
                     "verdicts": [run_state.value for run_state, _ in runs],
                 },
             )
-        return self._finish(state, output, task, start, flaky=flaky)
+        # After a primary that ran (PASSED/FAILED), run the held-out secondary suite
+        # to populate the model-gap signal (M2 §9 / D21).
+        secondary_passed = self._run_secondary(task, workspace)
+        return self._finish(
+            state, output, task, start, flaky=flaky, secondary_passed=secondary_passed
+        )
 
     # --- internals -----------------------------------------------------------
 
@@ -258,6 +263,31 @@ class VerifierSandbox:
         output = _normalize_test_output((proc.stdout or "") + (proc.stderr or ""))
         return state, output
 
+    def _run_secondary(self, task: Task, workspace: Path) -> bool | None:
+        """Run the held-out secondary suite; return pass/fail, or None if there is none.
+
+        Anti-wireheading (M2 §9 / D21): the secondary suite is re-materialized from the
+        pristine fixture AFTER the patch, so a candidate patch cannot tamper with the
+        held-out check. It runs under the same pinned, isolated environment as the
+        primary.
+        """
+        if not task.secondary_test_command:
+            return None
+        self._rematerialize_secondary(task, workspace)
+        command = self._phase2_command(task.secondary_test_command)
+        state, _ = self._run_primary_once(command, workspace)
+        return state == VerdictState.PASSED
+
+    def _rematerialize_secondary(self, task: Task, workspace: Path) -> None:
+        """Copy the secondary suite from the pristine fixture into the workspace.
+
+        The secondary test file is the last element of ``secondary_test_command`` (the
+        pytest target); it is copied from ``repo_path`` (the committed fixture) over any
+        version a patch may have altered in the workspace.
+        """
+        secondary_file = task.secondary_test_command[-1]
+        shutil.copy2(task.repo_path / secondary_file, workspace / secondary_file)
+
     def _finish(
         self,
         state: VerdictState,
@@ -266,6 +296,7 @@ class VerifierSandbox:
         start: float,
         *,
         flaky: bool = False,
+        secondary_passed: bool | None = None,
     ) -> Verdict:
         duration = time.monotonic() - start
         logger.info(
@@ -274,11 +305,18 @@ class VerifierSandbox:
                 "event": "verify_completed",
                 "task_id": task.task_id,
                 "verdict_state": state.value,
+                "secondary_passed": secondary_passed,
                 "flaky": flaky,
                 "verify_seconds": duration,
             },
         )
-        return Verdict(state=state, output=output, flaky=flaky, duration_seconds=duration)
+        return Verdict(
+            state=state,
+            output=output,
+            secondary_passed=secondary_passed,
+            flaky=flaky,
+            duration_seconds=duration,
+        )
 
     def _ensure_workspace(self, task: Task) -> Path:
         """Return a disposable git workspace for ``task``, creating it once."""

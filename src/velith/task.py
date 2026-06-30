@@ -30,6 +30,10 @@ DEFAULT_FIXTURES_ROOT: Final[Path] = Path("tests/fixtures")
 #: The hidden-test file inside the fixture repo, run by the verifier.
 HIDDEN_TEST_FILE: Final[str] = "test_calculator.py"
 
+#: The held-out secondary suite — the model-gap detector (M2, D21/§9). Never shown
+#: to the proposer; re-materialized from the pristine fixture after patch apply.
+SECONDARY_TEST_FILE: Final[str] = "test_secondary.py"
+
 _FIXTURE_PROMPT: Final[str] = (
     "The function `add(a, b)` in `calculator.py` must return the sum of its two "
     "integer arguments, but it currently returns the wrong value. Fix the bug in "
@@ -53,6 +57,8 @@ class Task(BaseModel):
     repo_path: Path
     prompt: str
     hidden_test_command: tuple[str, ...]
+    # The held-out secondary suite invocation; empty means "no secondary" (M2).
+    secondary_test_command: tuple[str, ...] = ()
 
 
 def load_fixture_task(fixtures_root: Path | None = None) -> Task:
@@ -69,4 +75,5 @@ def load_fixture_task(fixtures_root: Path | None = None) -> Task:
         repo_path=root / FIXTURE_TASK_ID,
         prompt=_FIXTURE_PROMPT,
         hidden_test_command=("python", "-m", "pytest", "-q", HIDDEN_TEST_FILE),
+        secondary_test_command=("python", "-m", "pytest", "-q", SECONDARY_TEST_FILE),
     )

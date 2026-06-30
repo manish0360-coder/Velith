@@ -55,11 +55,24 @@ def _patch(replacement: str) -> str:
     return "".join(diff)
 
 
+def _replace_file_patch(filename: str, modified: str) -> str:
+    """Build a unified diff that replaces a whole fixture file (for the tamper test)."""
+    original = (_TASK_DIR / filename).read_text(encoding="utf-8")
+    return "".join(
+        difflib.unified_diff(
+            original.splitlines(keepends=True),
+            modified.splitlines(keepends=True),
+            fromfile=f"a/{filename}",
+            tofile=f"b/{filename}",
+        )
+    )
+
+
 def test_good_patch_passes() -> None:
     with VerifierSandbox() as sandbox:
         verdict = sandbox.verify(_fixture_task(), _patch("a + b"))
     assert verdict.state == VerdictState.PASSED
-    assert verdict.secondary_passed is None  # M1 placeholder; M2 populates it
+    assert verdict.secondary_passed is True  # M2-C4 populates it; the correct fix passes
     assert verdict.duration_seconds >= 0.0
 
 
@@ -209,3 +222,35 @@ def test_deterministic_primary_is_not_flaky() -> None:
         verdict = sandbox.verify(_fixture_task(), _patch("a + b"))
     assert verdict.state == VerdictState.PASSED
     assert verdict.flaky is False
+
+
+# --- M2-C4: held-out secondary suite and model-gap signal ---------------------
+
+
+def test_secondary_passed_true_when_held_out_suite_passes() -> None:
+    with VerifierSandbox(network_isolation=False) as sandbox:
+        verdict = sandbox.verify(_fixture_task(), _patch("a + b"))
+    assert verdict.state == VerdictState.PASSED
+    assert verdict.secondary_passed is True
+
+
+def test_model_gap_primary_passes_but_secondary_fails() -> None:
+    # A "cheating" patch hardcodes the primary's expected value: the primary passes,
+    # but the held-out secondary fails -> secondary_passed=False (the model-gap).
+    with VerifierSandbox(network_isolation=False) as sandbox:
+        verdict = sandbox.verify(_fixture_task(), _patch("5"))
+    assert verdict.state == VerdictState.PASSED
+    assert verdict.secondary_passed is False
+
+
+def test_secondary_suite_is_tamper_proof() -> None:
+    # A patch that rewrites the secondary to trivially pass must NOT game the held-out
+    # check: it is re-materialized from the pristine fixture after patch apply.
+    tamper = _replace_file_patch(
+        "test_secondary.py",
+        "# mypy: ignore-errors\ndef test_gamed() -> None:\n    assert True\n",
+    )
+    with VerifierSandbox(network_isolation=False) as sandbox:
+        verdict = sandbox.verify(_fixture_task(), tamper)
+    # calculator.py is unpatched (still buggy) -> the pristine secondary fails.
+    assert verdict.secondary_passed is False
