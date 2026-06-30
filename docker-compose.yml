@@ -24,6 +24,13 @@ services:
     # Desktop resolves this automatically; the explicit mapping keeps it portable.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # The verifier isolates the Phase-2 test-execution step from the network via
+    # `unshare -n`, which requires CAP_SYS_ADMIN (M2_SPEC §10, D19). The R3 prototype
+    # confirmed unprivileged `unshare -rn` is blocked by the Docker Desktop seccomp
+    # profile; this capability is the ratified mechanism (Fallback B), granted only to
+    # this disposable verifier container.
+    cap_add:
+      - SYS_ADMIN
     # Default command runs the sanity suite. Override at the CLI for other steps,
     # e.g. `docker compose run --rm verifier ruff check .`, or to run the spike:
     # `docker compose run --rm verifier python -m velith.runner.spike --task <id> --seed 0`.

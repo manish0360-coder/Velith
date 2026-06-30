@@ -12,17 +12,30 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
+from velith.core.config import get_settings
 from velith.episodes.episode import VerdictState
+from velith.harness import verifier_sandbox as _verifier_sandbox
 from velith.harness.verifier_sandbox import SandboxExecutionError, Verdict, VerifierSandbox
 from velith.task import FIXTURE_TASK_ID, Task, load_fixture_task
 
 # tests/unit/test_verifier_sandbox.py -> parents[1] is tests/
 _FIXTURES_ROOT = Path(__file__).resolve().parents[1] / "fixtures"
 _TASK_DIR = _FIXTURES_ROOT / FIXTURE_TASK_ID
+
+
+@pytest.fixture(autouse=True)
+def _network_isolation_off_by_default(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # The verdict-logic tests here are not about isolation; default it OFF so they
+    # never require CAP_SYS_ADMIN (CI-safe). The isolation tests opt in explicitly.
+    monkeypatch.setenv("VELITH_VERIFIER_NETWORK_ISOLATION", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _fixture_task() -> Task:
@@ -142,3 +155,37 @@ def test_verify_output_is_deterministic_for_a_fixed_patch() -> None:
         second = sandbox.verify(task, patch)
     assert first.state == second.state == VerdictState.PASSED
     assert first.output == second.output
+
+
+# --- M2-C2: two-phase network-isolated test execution ------------------------
+
+
+def test_isolation_disabled_runs_without_unshare() -> None:
+    with VerifierSandbox(network_isolation=False) as sandbox:
+        verdict = sandbox.verify(_fixture_task(), _patch("a + b"))
+    assert verdict.state == VerdictState.PASSED
+
+
+def test_phase2_blocks_network_egress() -> None:
+    if not _verifier_sandbox._network_isolation_available():
+        pytest.skip("network isolation requires CAP_SYS_ADMIN / unshare -n (unavailable here)")
+    egress = (
+        "import socket\n"
+        "socket.setdefaulttimeout(4)\n"
+        "try:\n"
+        "    socket.create_connection(('1.1.1.1', 53))\n"
+        "    raise SystemExit('EGRESS REACHED')\n"
+        "except OSError:\n"
+        "    pass\n"
+    )
+    task = _fixture_task().model_copy(update={"hidden_test_command": ("python", "-c", egress)})
+    with VerifierSandbox(network_isolation=True) as sandbox:
+        verdict = sandbox.verify(task, _patch("a + b"))
+    # The egress attempt fails inside the isolated namespace -> the check exits 0.
+    assert verdict.state == VerdictState.PASSED
+
+
+def test_isolation_required_but_unavailable_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_verifier_sandbox, "_network_isolation_available", lambda: False)
+    with VerifierSandbox(network_isolation=True) as sandbox, pytest.raises(SandboxExecutionError):
+        sandbox.verify(_fixture_task(), _patch("a + b"))

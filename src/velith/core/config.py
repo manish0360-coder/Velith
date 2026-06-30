@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # loop in M2-C3.
     flake_rerun_count: int = 3
 
+    # Run the Phase-2 hidden-test step network-isolated (`unshare -n`, needs
+    # CAP_SYS_ADMIN). Mandatory in production; if the mechanism is unavailable the
+    # verifier raises rather than running untrusted code unisolated (D19).
+    verifier_network_isolation: bool = True
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

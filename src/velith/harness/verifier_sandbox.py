@@ -42,6 +42,7 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict
 
+from velith.core.config import get_settings
 from velith.core.logging import get_logger
 from velith.episodes.episode import VerdictState
 from velith.task import Task
@@ -63,6 +64,25 @@ _DURATION_RE = re.compile(r"in \d+\.\d+s")
 def _normalize_test_output(text: str) -> str:
     """Strip non-deterministic timing from captured hidden-test output (D16.1)."""
     return _DURATION_RE.sub("in <duration>", text)
+
+
+def _network_isolation_available() -> bool:
+    """True iff ``unshare -n`` can create a network namespace here (D19).
+
+    Requires CAP_SYS_ADMIN under Docker Desktop/WSL2 (the R3 prototype showed
+    unprivileged ``unshare -rn`` is blocked by seccomp). Used to skip
+    isolation-dependent tests where the capability is absent, and to refuse to run
+    untrusted code unisolated when isolation is required.
+    """
+    try:
+        proc = subprocess.run(
+            ["unshare", "-n", "--", "true"],
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
 
 
 # Fixed environment injected into the hidden-test process so the verdict is
@@ -111,8 +131,20 @@ class VerifierSandbox:
     context manager, or call :meth:`close` to remove the workspace.
     """
 
-    def __init__(self, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        *,
+        network_isolation: bool | None = None,
+    ) -> None:
         self._timeout = timeout_seconds
+        # Isolation defaults to the validated Settings value (mandatory in
+        # production); tests pass it explicitly to opt in/out (D19).
+        self._network_isolation = (
+            network_isolation
+            if network_isolation is not None
+            else get_settings().verifier_network_isolation
+        )
         self._root: Path | None = None
         self._workspace: Path | None = None
         self._task_id: str | None = None
@@ -160,9 +192,13 @@ class VerifierSandbox:
         if apply_proc.returncode != 0:
             return self._finish(VerdictState.PATCH_APPLY_FAILED, apply_proc.stderr, task, start)
 
+        # Phase 1 (network ON) is the workspace prep above. Phase 2 runs the hidden
+        # test, network-isolated when configured (D19); this may raise if isolation
+        # is required but unavailable, so untrusted code is never run unisolated.
+        command = self._phase2_command(task.hidden_test_command)
         try:
             test_proc = subprocess.run(
-                list(task.hidden_test_command),
+                command,
                 cwd=workspace,
                 capture_output=True,
                 text=True,
@@ -180,6 +216,23 @@ class VerifierSandbox:
         return self._finish(state, output, task, start)
 
     # --- internals -----------------------------------------------------------
+
+    def _phase2_command(self, hidden_test_command: tuple[str, ...]) -> list[str]:
+        """Wrap the hidden-test command for Phase-2 network isolation (D19).
+
+        With isolation on, the test runs in a fresh network namespace (``unshare -n``,
+        needs CAP_SYS_ADMIN). If the capability is unavailable, raise rather than run
+        untrusted code unisolated. With isolation off (a sanctioned non-production
+        setting), the command runs as-is.
+        """
+        if not self._network_isolation:
+            return list(hidden_test_command)
+        if not _network_isolation_available():
+            raise SandboxExecutionError(
+                "network isolation is required but unavailable (needs CAP_SYS_ADMIN "
+                "for `unshare -n`); refusing to run untrusted code unisolated"
+            )
+        return ["unshare", "-n", "--", *hidden_test_command]
 
     def _finish(self, state: VerdictState, output: str, task: Task, start: float) -> Verdict:
         duration = time.monotonic() - start
