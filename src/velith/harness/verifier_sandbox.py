@@ -30,6 +30,7 @@ for the episode store path in C2.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -62,6 +63,19 @@ _DURATION_RE = re.compile(r"in \d+\.\d+s")
 def _normalize_test_output(text: str) -> str:
     """Strip non-deterministic timing from captured hidden-test output (D16.1)."""
     return _DURATION_RE.sub("in <duration>", text)
+
+
+# Fixed environment injected into the hidden-test process so the verdict is
+# reproducible to Determinism Level 4 (M2_SPEC §7, D18): hash randomization, time
+# zone, and locale are pinned, and bytecode writing is disabled. These are
+# invariants, not tunables — varying them would break Level 4 — so they live here
+# as a verifier constant rather than as operator-facing Settings fields.
+_DETERMINISTIC_ENV: Final[dict[str, str]] = {
+    "PYTHONHASHSEED": "0",
+    "TZ": "UTC",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+}
 
 
 class SandboxExecutionError(Exception):
@@ -153,6 +167,7 @@ class VerifierSandbox:
                 capture_output=True,
                 text=True,
                 timeout=self._timeout,
+                env={**os.environ, **_DETERMINISTIC_ENV},
             )
         except subprocess.TimeoutExpired:
             message = f"hidden test exceeded the {self._timeout:.0f}s wall-clock budget"

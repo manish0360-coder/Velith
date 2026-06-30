@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     # Append-only JSONL episode store path (host-mounted + gitignored in C9).
     episode_path: Path = Path("data/episodes/episodes.jsonl")
 
+    # --- M2 settings (verifier hardening; M2_SPEC §4) ---
+    # Number of times the primary hidden test is re-run for flake detection.
+    # Placeholder in M2-C1 (the pinned-environment commit); consumed by the flake
+    # loop in M2-C3.
+    flake_rerun_count: int = 3
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

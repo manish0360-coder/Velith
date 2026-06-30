@@ -112,3 +112,33 @@ def test_verdict_output_is_timing_normalized() -> None:
     # The volatile pytest duration must not survive (D16.1: reproducible content hash).
     assert re.search(r"in \d+\.\d+s", verdict.output) is None
     assert "in <duration>" in verdict.output
+
+
+# --- M2-C1: pinned deterministic execution environment -----------------------
+
+
+def test_deterministic_env_is_injected_into_the_test_process() -> None:
+    # Override the hidden-test command with one that asserts the pinned env is
+    # present; it exits 0 (-> PASSED) only if the verifier injected the env (D18).
+    env_check = (
+        "import os; "
+        "assert os.environ['PYTHONHASHSEED'] == '0'; "
+        "assert os.environ['TZ'] == 'UTC'; "
+        "assert os.environ['LC_ALL'] == 'C'; "
+        "assert os.environ['PYTHONDONTWRITEBYTECODE'] == '1'"
+    )
+    task = _fixture_task().model_copy(update={"hidden_test_command": ("python", "-c", env_check)})
+    with VerifierSandbox() as sandbox:
+        verdict = sandbox.verify(task, _patch("a + b"))
+    assert verdict.state == VerdictState.PASSED
+
+
+def test_verify_output_is_deterministic_for_a_fixed_patch() -> None:
+    # Determinism Level 3 for a fixed patch: same verdict and identical output.
+    task = _fixture_task()
+    patch = _patch("a + b")
+    with VerifierSandbox() as sandbox:
+        first = sandbox.verify(task, patch)
+        second = sandbox.verify(task, patch)
+    assert first.state == second.state == VerdictState.PASSED
+    assert first.output == second.output
