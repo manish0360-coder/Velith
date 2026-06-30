@@ -172,3 +172,64 @@ cat data/episodes/episodes.jsonl
 Each line is one episode: the task, the exact prompt, the candidate patch, the
 verdict and raw test output, token/latency provenance, and the `content_hash`
 that is re-verified whenever episodes are read back.
+
+## M2 — the hardened verifier
+
+M2 makes the verifier trustworthy as the program's exact ground truth: the verdict is
+produced under a pinned, network-isolated, two-phase execution; flaky tests are
+detected and flagged; and a held-out secondary suite surfaces the software "model gap."
+The verdict taxonomy is unchanged — `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`,
+`NO_PATCH`, `INFRA_ERROR`.
+
+### Requirement: `CAP_SYS_ADMIN`
+
+The verifier isolates the test-execution step from the network with `unshare -n`, which
+requires the `CAP_SYS_ADMIN` capability. `docker-compose.yml` grants it to the verifier
+container:
+
+```yaml
+cap_add:
+  - SYS_ADMIN
+```
+
+Isolation is **mandatory**: if the capability is unavailable, the verifier raises
+(`INFRA_ERROR`) rather than running untrusted code with network access. The R3
+prototype found that unprivileged `unshare -rn` is blocked by the Docker Desktop / WSL2
+seccomp profile, so this capability is the supported mechanism (see `docs/NOTES.md` for
+the environment record).
+
+### Two-phase execution
+
+- **Phase 1 (network ON):** workspace and dependency preparation.
+- **Phase 2 (network OFF):** the hidden tests run wrapped in `unshare -n`, so generated
+  code cannot reach the network.
+
+### Determinism Level 4
+
+The verdict is reproducible to **Level 4** — same *execution environment*. The test
+process runs with a pinned environment (`PYTHONHASHSEED=0`, `TZ=UTC`, `LC_ALL=C`) in the
+pinned base image, so the verdict, its normalized output, and the `content_hash` are
+bit-for-bit reproducible for a fixed patch.
+
+### Flake detection (`flaky`)
+
+The primary test is run several times (`VELITH_FLAKE_RERUN_COUNT`, default `3`). If the
+runs disagree, the measurement is untrustworthy: the episode is flagged `flaky=True` and
+a loud log is emitted. Flakiness is **provenance, not a verdict** — no new verdict state
+is introduced, and `flaky` is **excluded from the `content_hash`** (it can vary between
+re-runs, so hashing it would break reproducibility).
+
+### Held-out secondary suite (`secondary_passed`)
+
+After the primary verdict, the verifier runs a **held-out secondary** suite — extra
+cases never shown to the model. A patch that games the visible test (e.g. hardcoding the
+expected value) passes the primary but fails the secondary, recorded as
+`secondary_passed=False`: the **model gap**. The secondary suite is re-materialized from
+the pristine fixture *after* the patch is applied, so a candidate patch cannot tamper
+with the held-out check. Unlike `flaky`, `secondary_passed` is part of episode identity
+(inside the `content_hash`).
+
+### Relevant settings
+
+- `VELITH_VERIFIER_NETWORK_ISOLATION` — isolate the test step (default `true`).
+- `VELITH_FLAKE_RERUN_COUNT` — primary-test reruns for flake detection (default `3`).
