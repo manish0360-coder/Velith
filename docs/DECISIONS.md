@@ -42,6 +42,12 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D13 | Engineering environment baseline | Accepted |
 | D14 | Non-goals (explicitly out of scope) | Accepted |
 | D15 | Decisions intentionally postponed | Postponed (by design) |
+| D16 | M1 ratification clarifications (Q1–Q7) | Accepted |
+| D17 | Verdict taxonomy unchanged; flakiness is metadata (M2) | Accepted |
+| D18 | Determinism Levels; M2 targets Level 4 (M2) | Accepted |
+| D19 | Two-phase hardened sandbox; isolation mechanism (M2) | Accepted |
+| D20 | M2 explicit out-of-scope set (M2) | Accepted |
+| D21 | `flaky` is provenance, not identity (M2) | Accepted |
 
 ---
 
@@ -302,6 +308,106 @@ The value MiniNoetica delivered was the **engineering experience and reusable im
 **Rationale.** Postponement is a positive engineering act here: it prevents building cathedrals on an unverified foundation. Each postponed item is gated on a specific validation result, so the program knows exactly what earns the right to decide it.
 
 **Consequences.** This list is the explicit boundary between "decided" and "deferred." An attempt to build any postponed item before its gate is a deviation that must be recorded here with justification.
+
+---
+
+## D16 — M1 ratification clarifications (Q1–Q7)
+
+**Status:** Accepted (clarifications). **Date:** 2026-06-22.
+**Scope:** These entries clarify the application of existing decisions (D2, D3, D4, D6, D8, D9, D12, D13) to milestone M1. None supersedes or alters D1–D15; each is a clarification, not a redesign. Where a clarification touches the M0–M10 roadmap acceptance text ratified under D12, it refines wording without changing the ratified substance.
+
+### D16.1 — M1 reproducibility is scoped to the verify→log path
+The roadmap's M1 acceptance ("same seed + temperature 0 → same verdict") is clarified: M1's **blocking** reproducibility criterion is that, **given a recorded proposal (fixed patch), the verify→log path produces the same verdict and the same content hash**. Proposal-level model determinism (seed + temperature 0) is attempted and recorded but is **not** a blocking criterion, because local model generation cannot be honestly guaranteed bit-identical across runs/hardware. This *locates determinism in the verifier*, consistent with and strengthening D3. (Clarifies D12; does not alter D3.)
+
+### D16.2 — M1 orchestration runs in-container; Ollama reached via host
+The M1 spike orchestrator runs **inside the container** (Python 3.12 target, D13), network-enabled, reaching the host Ollama service via `host.docker.internal` (WSL2 + Docker Desktop). The **verdict is produced in-container** (D3/M0 invariant preserved). The host Python (3.10) is never an execution target. Transient network access during the M1 run is an accepted, documented condition; isolating the test-execution step from the network is a later hardening step, not an M1 concern. (Clarifies D13.)
+
+### D16.3 — M1 uses a minimal representative fixture task, not real SWE-bench
+M1 exercises the loop with a **minimal, self-contained fixture task** of the same shape as a SWE-bench task (small repo + hidden test). Real SWE-bench Verified integration is deferred to M4. The fixture is **not a benchmark** and must never be used as the ratifying measurement (D8 held-out discipline is unaffected). (Clarifies D4/D6; does not alter D8.)
+
+### D16.4 — M1 introduces a thin LLM adapter, not routing
+M1 adds a **thin `llm/client.py` adapter** (generate + call metadata) so the proposer depends on a model capability, not on a vendor (D9). Model routing, selection policy, and the cost guard remain out of scope until M5; the adapter must not grow into a routing framework in M1. (Implements D9.)
+
+### D16.5 — D8's non-saturating base-model condition binds from M5, not M1
+The non-saturating base-model methodological condition (D8) governs the **compounding experiment (M5+)**. M1 may use any small local code-capable Ollama model that can emit diff-shaped output; the model and version are recorded in every episode for provenance and swappability. (Clarifies the scope of D8.)
+
+### D16.6 — M1 episode persistence
+Episodes persist to host `./data/episodes/` via a bind mount, gitignored, as an append-only JSONL store. The indexed/queryable store is M3. (Implementation clarification; consistent with I2/observability.)
+
+### D16.7 — M1 verdict taxonomy and the outcome/error distinction
+M1 verdict states are: `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`, `NO_PATCH` (all **logged grounded outcomes**, process exit 0) and `INFRA_ERROR` (the **only** error state, non-zero exit). A test failure is a valid grounded outcome and first-class learning data, never an error. No model judges any verdict (D3). `secondary_passed` is null in M1 (populated at M2) and is not a verdict state. (Operationalizes D2/D3.)
+
+> **Provenance note (2026-06-25):** D16 above is restored **verbatim** from commit `b8d458e` ("docs: ratify M1 engineering clarifications (D16)"), which originally recorded it. It was inadvertently removed by commit `cc4a1b4` ("docs: finalize M1 implementation contracts") and was absent from the record until this restoration. No wording was changed.
+
+---
+
+## D17 — M2: verdict taxonomy unchanged; flakiness is metadata
+
+**Status:** Accepted. **Date:** 2026-06-25. **(Ratifies M2 R1.)**
+
+**Decision.** M2 introduces no new verdict state. The closed taxonomy remains `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`, `NO_PATCH`, `INFRA_ERROR` (D16.7). Test flakiness is *measurement quality*, recorded as a boolean `flaky` on the `Verdict` and persisted as episode provenance — never a verdict state.
+
+**Rationale.** A verdict names the grounded outcome; flakiness names the trustworthiness of the measurement. Conflating them would pollute a closed outcome taxonomy with a quality signal and burden every downstream consumer.
+
+**Alternatives rejected.** A `FLAKY` verdict state (mixes outcome and measurement quality in one field).
+
+**Consequences.** Downstream memory policies (M5+) may consume the `flaky` provenance to down-weight or exclude unstable episodes. See D21 for the hash treatment of `flaky`.
+
+---
+
+## D18 — M2: Determinism Levels; M2 targets Level 4
+
+**Status:** Accepted. **Date:** 2026-06-25. **(Ratifies M2 R2.)**
+
+**Decision.** Verifier reproducibility is graded: **L1** same verdict ⊂ **L2** same content hash ⊂ **L3** same verifier output ⊂ **L4** same execution environment. M2 targets **Level 4** via a pinned interpreter environment (`PYTHONHASHSEED`, `TZ`, `LC_ALL`), network-isolated test execution, and the pinned base image, so L1–L3 hold structurally.
+
+**Rationale.** M1 reached L2 incidentally (via output normalization). Pinning the environment makes reproducibility structural — which the compounding experiment (D6) requires of its grounding signal (D2/D3), strengthening D3 and D16.1.
+
+**Alternatives rejected.** Relying on post-hoc output normalization alone (incidental and fragile).
+
+**Consequences.** The verifier injects a fixed environment and isolates the test step; cross-machine equality follows from the pinned image and is asserted same-machine in CI.
+
+---
+
+## D19 — M2: two-phase hardened sandbox; isolation mechanism
+
+**Status:** Accepted. **Date:** 2026-06-25. **(Ratifies M2 R3.)**
+
+**Decision.** The verifier executes tests in two phases — Phase 1 network **ON** (dependency preparation), Phase 2 network **OFF** (test execution). A feasibility prototype determined that unprivileged `unshare -rn` is blocked by the Docker Desktop/WSL2 default seccomp profile, while `cap_add: SYS_ADMIN` + `unshare -n` succeeds; the latter is the **supported mechanism**. Isolation is mandatory: if the mechanism is unavailable, the verifier raises (`SandboxExecutionError` → `INFRA_ERROR`) rather than running untrusted code unisolated. The spike remains single-container.
+
+**Rationale.** Closes the accepted M1 network-exposure risk (R3 / D16.2): untrusted generated code must not reach the network. Two phases preserve the proposal step's required network while isolating the test step.
+
+**Alternatives rejected.** Unprivileged `unshare -rn` (blocked by seccomp, proven by prototype); a `--network none` sidecar (reintroduces a second container and a Docker-socket dependency, contradicting the single-container model).
+
+**Consequences.** `docker-compose.yml` grants `cap_add: [SYS_ADMIN]` to the disposable verifier container; CI runs the isolation tests where the capability is available and capability-skips them (with an explicit reason) otherwise — never silently passed.
+
+---
+
+## D20 — M2: explicit out-of-scope set
+
+**Status:** Accepted. **Date:** 2026-06-25. **(Ratifies M2 R4.)**
+
+**Decision.** Property-based testing, resource profiling, streaming generation, richer proposer prompts, and git-ref provenance are out of scope for M2.
+
+**Rationale.** M2 is verifier hardening; these are unrelated enhancements that would expand scope and risk.
+
+**Alternatives rejected.** Folding any of these into M2 (scope creep).
+
+**Consequences.** The M2 held-out secondary suite is explicit example-based cases; the proposer and the episode provenance fields are otherwise unchanged.
+
+---
+
+## D21 — M2: `flaky` is provenance, not identity (excluded from the content hash)
+
+**Status:** Accepted. **Date:** 2026-06-25. **(Ratifies M2 R5.)**
+
+**Decision.** The `flaky` flag is persisted in the episode but **excluded from the canonical `content_hash`**. The content hash covers reproducible *identity* only; a field belongs inside it iff it is a reproducible function of `(task, patch, environment)`. `flaky` is the observed output of a non-deterministic sampling process and may differ across re-verifications of a fixed proposal, so it is *provenance*, recorded alongside the timing fields outside the hash. `secondary_passed`, by contrast, is deterministic and therefore *identity* (inside the hash).
+
+**Rationale.** Including `flaky` in the hash would make the Determinism Level 2 / D16.1 "same hash on re-verification" criterion unsatisfiable for the very episodes `flaky` exists to flag. Reproducible identity and full-record integrity are distinct concerns served by distinct digests.
+
+**Alternatives rejected.** `flaky` inside the content hash (breaks D16.1 reproducibility); `flaky` left unpersisted (loses provenance needed by M5+ memory policies). Full-record tamper-evidence, if ever required, is a separate record-level digest (an M3 storage concern), never the content hash.
+
+**Consequences.** `episodes/episode.py` adds `flaky` to `HASH_EXCLUDED_FIELDS`; a test asserts a varying `flaky` leaves the content hash unchanged.
 
 ---
 
