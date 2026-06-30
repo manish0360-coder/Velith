@@ -189,3 +189,23 @@ def test_isolation_required_but_unavailable_raises(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(_verifier_sandbox, "_network_isolation_available", lambda: False)
     with VerifierSandbox(network_isolation=True) as sandbox, pytest.raises(SandboxExecutionError):
         sandbox.verify(_fixture_task(), _patch("a + b"))
+
+
+# --- M2-C3: flake detection and provenance -----------------------------------
+
+
+def test_flake_detection_flags_a_nondeterministic_test() -> None:
+    # The flaky fixture alternates pass/fail across the reruns -> flaky=True.
+    task = _fixture_task().model_copy(
+        update={"hidden_test_command": ("python", "-m", "pytest", "-q", "test_flake.py")},
+    )
+    with VerifierSandbox(network_isolation=False) as sandbox:
+        verdict = sandbox.verify(task, _patch("a + b"))
+    assert verdict.flaky is True
+
+
+def test_deterministic_primary_is_not_flaky() -> None:
+    with VerifierSandbox(network_isolation=False) as sandbox:
+        verdict = sandbox.verify(_fixture_task(), _patch("a + b"))
+    assert verdict.state == VerdictState.PASSED
+    assert verdict.flaky is False

@@ -74,11 +74,14 @@ HASH_BOUNDARY_FIELDS: Final[tuple[str, ...]] = (
 )
 
 # Fields recorded in the episode but deliberately OUTSIDE the hash boundary
-# (volatile/timing + the hash itself). See §9.1.1 / RK14.
+# (volatile/timing + measurement-quality + the hash itself). `flaky` is provenance,
+# not identity (M2 R5/D21): it is a non-deterministic measurement-quality sample, so
+# including it would break Determinism Level 2 / D16.1 for flaky episodes.
 HASH_EXCLUDED_FIELDS: Final[tuple[str, ...]] = (
     "timestamp",
     "latency_seconds",
     "verify_seconds",
+    "flaky",
     "content_hash",
 )
 
@@ -129,6 +132,9 @@ class Episode(BaseModel):
     timestamp: str
     latency_seconds: float
     verify_seconds: float
+    # Measurement quality: the primary test's reruns disagreed (M2 R5/D21). Provenance,
+    # not identity — recorded but excluded from the content hash.
+    flaky: bool = False
 
     # --- Integrity (OUTSIDE the boundary; derived from the content fields) ---
     content_hash: str
@@ -167,6 +173,7 @@ class Episode(BaseModel):
         velith_version: str,
         arm: str = DEFAULT_ARM,
         secondary_passed: bool | None = None,
+        flaky: bool = False,
         timestamp: str | None = None,
     ) -> Episode:
         """Assemble an episode and compute its content hash.
@@ -196,6 +203,7 @@ class Episode(BaseModel):
             timestamp=resolved_timestamp,
             latency_seconds=latency_seconds,
             verify_seconds=verify_seconds,
+            flaky=flaky,
             content_hash="",
         )
         return draft.model_copy(update={"content_hash": draft.compute_hash()})

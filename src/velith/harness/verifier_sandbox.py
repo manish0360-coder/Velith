@@ -120,6 +120,7 @@ class Verdict(BaseModel):
     state: VerdictState
     output: str
     secondary_passed: bool | None = None
+    flaky: bool = False
     duration_seconds: float
 
 
@@ -136,6 +137,7 @@ class VerifierSandbox:
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         *,
         network_isolation: bool | None = None,
+        flake_rerun_count: int | None = None,
     ) -> None:
         self._timeout = timeout_seconds
         # Isolation defaults to the validated Settings value (mandatory in
@@ -144,6 +146,10 @@ class VerifierSandbox:
             network_isolation
             if network_isolation is not None
             else get_settings().verifier_network_isolation
+        )
+        # Flake detection re-runs the primary test this many times (M2 R1/D17).
+        self._flake_rerun_count = (
+            flake_rerun_count if flake_rerun_count is not None else get_settings().flake_rerun_count
         )
         self._root: Path | None = None
         self._workspace: Path | None = None
@@ -196,24 +202,22 @@ class VerifierSandbox:
         # test, network-isolated when configured (D19); this may raise if isolation
         # is required but unavailable, so untrusted code is never run unisolated.
         command = self._phase2_command(task.hidden_test_command)
-        try:
-            test_proc = subprocess.run(
-                command,
-                cwd=workspace,
-                capture_output=True,
-                text=True,
-                timeout=self._timeout,
-                env={**os.environ, **_DETERMINISTIC_ENV},
+        # Flake detection (M2 R1/D17): run the primary test N times and reconcile. If
+        # the runs disagree the measurement is untrustworthy (`flaky`), but the loop
+        # is still a successful run — `flaky` is provenance, not a verdict state.
+        runs = [self._run_primary_once(command, workspace) for _ in range(self._flake_rerun_count)]
+        state, output = runs[0]
+        flaky = any(run != runs[0] for run in runs[1:])
+        if flaky:
+            logger.warning(
+                "flaky primary test detected",
+                extra={
+                    "event": "flaky_detected",
+                    "task_id": task.task_id,
+                    "verdicts": [run_state.value for run_state, _ in runs],
+                },
             )
-        except subprocess.TimeoutExpired:
-            message = f"hidden test exceeded the {self._timeout:.0f}s wall-clock budget"
-            return self._finish(VerdictState.FAILED, message, task, start)
-        except OSError as exc:
-            raise SandboxExecutionError(f"failed to execute hidden test: {exc}") from exc
-
-        state = VerdictState.PASSED if test_proc.returncode == 0 else VerdictState.FAILED
-        output = _normalize_test_output((test_proc.stdout or "") + (test_proc.stderr or ""))
-        return self._finish(state, output, task, start)
+        return self._finish(state, output, task, start, flaky=flaky)
 
     # --- internals -----------------------------------------------------------
 
@@ -234,7 +238,35 @@ class VerifierSandbox:
             )
         return ["unshare", "-n", "--", *hidden_test_command]
 
-    def _finish(self, state: VerdictState, output: str, task: Task, start: float) -> Verdict:
+    def _run_primary_once(self, command: list[str], workspace: Path) -> tuple[VerdictState, str]:
+        """Run the primary hidden test once; return its (state, normalized output)."""
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=self._timeout,
+                env={**os.environ, **_DETERMINISTIC_ENV},
+            )
+        except subprocess.TimeoutExpired:
+            message = f"hidden test exceeded the {self._timeout:.0f}s wall-clock budget"
+            return VerdictState.FAILED, message
+        except OSError as exc:
+            raise SandboxExecutionError(f"failed to execute hidden test: {exc}") from exc
+        state = VerdictState.PASSED if proc.returncode == 0 else VerdictState.FAILED
+        output = _normalize_test_output((proc.stdout or "") + (proc.stderr or ""))
+        return state, output
+
+    def _finish(
+        self,
+        state: VerdictState,
+        output: str,
+        task: Task,
+        start: float,
+        *,
+        flaky: bool = False,
+    ) -> Verdict:
         duration = time.monotonic() - start
         logger.info(
             "verification completed",
@@ -242,10 +274,11 @@ class VerifierSandbox:
                 "event": "verify_completed",
                 "task_id": task.task_id,
                 "verdict_state": state.value,
+                "flaky": flaky,
                 "verify_seconds": duration,
             },
         )
-        return Verdict(state=state, output=output, duration_seconds=duration)
+        return Verdict(state=state, output=output, flaky=flaky, duration_seconds=duration)
 
     def _ensure_workspace(self, task: Task) -> Path:
         """Return a disposable git workspace for ``task``, creating it once."""

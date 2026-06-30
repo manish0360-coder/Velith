@@ -123,3 +123,14 @@ def test_canonical_hash_is_insertion_order_independent() -> None:
     forward = {"task_id": "t", "seed": 0, "arm": "baseline"}
     reordered = {"arm": "baseline", "seed": 0, "task_id": "t"}
     assert compute_content_hash(forward) == compute_content_hash(reordered)
+
+
+def test_flaky_is_provenance_and_excluded_from_the_hash() -> None:
+    """A varying `flaky` must not change the content hash (M2 R5/D21, RK4)."""
+    baseline = Episode.build(**_base_kwargs())
+    flaky_kwargs = _base_kwargs()
+    flaky_kwargs["flaky"] = True
+    flaky_variant = Episode.build(**flaky_kwargs)
+    assert baseline.flaky is False
+    assert flaky_variant.flaky is True
+    assert baseline.content_hash == flaky_variant.content_hash

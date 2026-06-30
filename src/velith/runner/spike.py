@@ -61,11 +61,13 @@ def run_spike(
         verdict_output = verdict.output
         verify_seconds = verdict.duration_seconds
         secondary_passed = verdict.secondary_passed
+        flaky = verdict.flaky
     else:
         state = VerdictState.NO_PATCH
         verdict_output = ""
         verify_seconds = 0.0
         secondary_passed = None
+        flaky = False
 
     episode = Episode.build(
         task_id=task.task_id,
@@ -82,6 +84,7 @@ def run_spike(
         verify_seconds=verify_seconds,
         velith_version=velith_version,
         secondary_passed=secondary_passed,
+        flaky=flaky,
     )
     store.append(episode)
     logger.info(
