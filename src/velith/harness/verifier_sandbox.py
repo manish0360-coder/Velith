@@ -1,12 +1,20 @@
-"""The deterministic verifier sandbox (M1 spec §7/§10, handoff §4.4).
+"""The deterministic, hardened verifier sandbox (M1 spec §7/§10; M2_SPEC §5/§6).
 
 ``VerifierSandbox`` is the single seam where a candidate patch is *disposed of*: it
 applies the patch to a disposable copy of the task's repository and runs the hidden
 test suite **inside the container**, returning a structured :class:`Verdict`. No
 model is involved and nothing here judges correctness with a model — the verdict is
-computed by ``git apply`` + running the hidden tests (D3, D16.7). This is the seam
-M2 hardens (network isolation of the test step, flake detection, bit-for-bit
-determinism); M1 keeps it functional, not hardened.
+computed by ``git apply`` + running the hidden tests (D3, D16.7).
+
+M2 hardened this seam without rewriting it (RK8), and the hardening is now in place:
+the hidden test runs in **two phases** — Phase 1 (network ON) prepares the workspace,
+Phase 2 (network OFF via ``unshare -n`` under ``CAP_SYS_ADMIN``) runs the tests; a
+**pinned environment** (``PYTHONHASHSEED``/``TZ``/``LC_ALL``) reaches Determinism
+Level 4 (R2/D18); the primary test is re-run N times for **flake detection**, recording
+the ``flaky`` provenance flag (R1/R5/D17/D21); and a **held-out secondary** suite,
+re-materialized from the pristine fixture after patch apply, populates the model-gap
+signal ``secondary_passed`` (§9/D21). The verdict taxonomy is unchanged (no ``FLAKY``
+state); isolation is mandatory (untrusted code is never run unisolated).
 
 Determinism by isolation (M1 spec §7). The sandbox operates on a **disposable copy**
 of the fixture repo — never the committed fixture under ``tests/fixtures/`` — held
@@ -17,15 +25,17 @@ disposable workspace under the system temp dir with its own ``.git`` (RK13). The
 patch-apply mechanism is pinned to ``git apply``; a clean non-apply maps to
 ``PATCH_APPLY_FAILED`` and is an *outcome*, never an exception.
 
-Outcome vs. error (D16.7). A test failure, a non-applying patch — these are verdict
-states, never raised. Only an infrastructure fault (git missing, copy/exec failure)
-raises :class:`SandboxExecutionError`; the orchestrator maps that to ``INFRA_ERROR``.
+Outcome vs. error (D16.7). A test failure, a non-applying patch, a flaky primary —
+these are verdict states/metadata, never raised. Only an infrastructure fault (git
+missing, copy/exec failure, or isolation required-but-unavailable) raises
+:class:`SandboxExecutionError`; the orchestrator maps that to ``INFRA_ERROR``.
 
-Configuration note (raised, not silently resolved — handoff preamble): the verifier
-timeout is a ``Settings`` field added in C7 (commit plan §4.8). To keep C4 atomic and
-green, the timeout is injected via the constructor with a default; the orchestrator
-(C7) will read it from ``Settings`` and pass it in — the same injection pattern used
-for the episode store path in C2.
+Configuration note: the verifier timeout is injected via the constructor with a
+default; network isolation and the flake-rerun count default to validated ``Settings``
+(``verifier_network_isolation``, ``flake_rerun_count``) and are overridable per
+construction for tests. The pinned determinism environment lives here as a verifier
+constant (``_DETERMINISTIC_ENV``) rather than operator-facing settings, because varying
+it would break Determinism Level 4 — it is an invariant, not a tunable.
 """
 
 from __future__ import annotations
@@ -110,9 +120,12 @@ class SandboxExecutionError(Exception):
 class Verdict(BaseModel):
     """The structured outcome of one verification.
 
-    ``secondary_passed`` is the M2 held-out-secondary slot and stays ``None`` in M1.
-    ``duration_seconds`` is the wall-clock time of the whole verify() call (the M1
-    ``verify_seconds`` signal).
+    ``secondary_passed`` is the held-out-secondary (model-gap) result: ``True``/``False``
+    after a primary that ran, ``None`` when no code ran (``PATCH_APPLY_FAILED``/no patch).
+    It is identity — inside the episode content hash. ``flaky`` is ``True`` iff the
+    primary test's N reruns disagreed (R1/R5); it is provenance — recorded but excluded
+    from the content hash. ``duration_seconds`` is the wall-clock time of the whole
+    verify() call (the ``verify_seconds`` signal).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

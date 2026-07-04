@@ -3,8 +3,8 @@
 **Project:** Velith
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
-**Last updated:** 2026-06-25
-**Current tag:** `m1-complete`
+**Last updated:** 2026-07-04
+**Current tag:** `m2-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -24,6 +24,16 @@ provenance-complete, content-hashed **episode** that survives container exit. Th
 M1 is a spike, not a system: one fixture task, one model, an append-only JSONL store. Breadth,
 scale, memory, experiment arms, and the compounding experiment are explicitly later milestones and
 were deliberately not built.
+
+**M2 — complete and certified** (`m2-complete`). The single `VerifierSandbox.verify` seam is now
+hardened so the verdict is trustworthy as the program's exact ground truth: the hidden test runs in
+**two phases** (Phase 1 network ON prep; Phase 2 network OFF via `unshare -n` under `CAP_SYS_ADMIN`);
+a **pinned environment** reaches **Determinism Level 4** (R2/D18); the primary test is re-run N times
+for **flake detection**, recording the `flaky` provenance flag (R1/R5 — excluded from the content
+hash, no new verdict state); and a **held-out secondary** suite, re-materialized from the pristine
+fixture after patch apply, populates the model-gap signal `secondary_passed` (identity — inside the
+hash). Isolation is mandatory: untrusted code is never run unisolated. This was a *hardening, not a
+rewrite* (RK8) — proposer, LLM client, and store are unchanged.
 
 ## 2. M1 objectives and achievements
 
@@ -113,17 +123,51 @@ Recorded for the M2 team; full categorization is in the M1 close-out review. Hig
 - The default Ollama request timeout (120s) is too short for multi-minute reasoning models; it is
   configurable via `VELITH_OLLAMA_TIMEOUT_SECONDS`.
 
-## 5. Readiness for M2
+## 5. M2 objectives, achievements, and verification
 
-M2 is the **deterministic, hardened verifier**: network isolation of the test-execution step,
-fixed/pinned execution environment, flake detection and quarantine, bit-for-bit determinism, and
-population of the `secondary_passed` field (the software model-gap detector).
+Every M2 engineering goal (M2_SPEC §2/§3) was met, confined to the hardening seam:
 
-The M1 verifier was built so M2 is a *hardening, not a rewrite*: patch-apply and test execution sit
-inside one bounded `VerifierSandbox.verify` method that M2 can wrap; the disposable-workspace and
-reset-before-run discipline is already in place; `secondary_passed` is present and `null`; and the
-record/replay reproducibility surface (D16.1) that M2 builds its determinism tests on is proven. No
-M1 work blocks M2.
+- **Network-isolated Phase 2** — the primary and secondary test commands run wrapped in `unshare -n`
+  under `CAP_SYS_ADMIN` (Fallback B, R3/D19); the mandatory-isolation invariant raises
+  `SandboxExecutionError` (-> `INFRA_ERROR`) rather than ever running untrusted code unisolated.
+- **Pinned environment -> Determinism Level 4** (R2/D18) — `PYTHONHASHSEED=0`, `TZ=UTC`, `LC_ALL=C`,
+  `PYTHONDONTWRITEBYTECODE=1` injected into the test subprocess; M1 output normalization retained.
+- **Flake detection** (R1/R5/D17/D21) — the primary is re-run N times (default 3) and reconciled; a
+  disagreement sets `flaky=True` with a loud structured warning and a nominal verdict. No `FLAKY`
+  state; `flaky` is persisted as provenance and excluded from the content hash.
+- **Held-out secondary / model-gap** (§9/D21) — `secondary_passed` populated from a suite
+  re-materialized from the pristine fixture after patch apply (anti-wireheading), and carried inside
+  the content hash via the C7 mapping.
+- **Seam preserved** (RK8) — `agent/proposer.py`, `llm/client.py`, `episodes/store.py` unmodified;
+  `episodes/episode.py` and `runner/spike.py` touched only by the sanctioned `flaky` field + one-line
+  passthrough.
 
-**Repository is M2-ready.** Begin M2 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1.
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `d75f641` | feat: pinned deterministic execution environment (M2-C1) |
+| `b800394` | feat: two-phase network-isolated test execution (M2-C2) |
+| `8a8d171` | feat: flake detection and provenance (M2-C3) |
+| `baed002` | feat: held-out secondary suite and model-gap signal (M2-C4) |
+| `a315dea` | docs: document hardened verifier (M2-C5) |
+
+**Definition of Done — all satisfied (M2_SPEC §3/§14).** Two-phase isolation works under
+`CAP_SYS_ADMIN` with a passing Phase-2 no-egress control; Determinism Level 4 holds and a varying
+`flaky` does not change the content hash; flake detection records `flaky` as provenance with no new
+state; `secondary_passed` is populated with the secondary tamper-proofed; the taxonomy is unchanged;
+all four gates are green in the container and CI. **Verification evidence:** local
+`docker compose run --rm verifier` — `ruff check`, `ruff format --check`, `mypy src tests`, and
+`pytest -q` (zero skips -> `test_phase2_blocks_network_egress` executed under `CAP_SYS_ADMIN`) all
+green; GitHub Actions CI #19-#23 green on `main` (RM-CI resolved, see `docs/NOTES.md`).
+
+## 6. Readiness for M3
+
+M3 extends **episode storage/indexing** without altering identity (content-hash) fields (M2_SPEC
+§15): an indexed/DB episode store and query surface, and — if required — a separate record-level
+integrity digest distinct from the content hash. The two-phase, pinned, isolated verifier is now the
+durable substrate every later rung reuses; the persisted `flaky` provenance is available to later
+consumers unchanged. No M2 work blocks M3.
+
+**Repository is M3-ready.** Begin M3 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1 and M2.

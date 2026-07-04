@@ -14,9 +14,14 @@ but the capability is absent, `verify` raises `SandboxExecutionError` (→ `INFR
 
 Environment support — record for future contributors:
 
-- Local Docker Desktop / WSL2: **SUPPORTED** (R3 prototype, Fallback B passed).
-- GitHub Actions CI: **TO BE CONFIRMED from the first M2-C2 CI run.** Inspect the CI log
-  for `tests/unit/test_verifier_sandbox.py::test_phase2_blocks_network_egress`: if it
-  RUNS, CI grants CAP_SYS_ADMIN; if it is SKIPPED with the capability reason, CI does
-  not (isolation is then a documented local-acceptance gate). Update this line with the
-  observed result after the run.
+- Local Docker Desktop / WSL2: **SUPPORTED** (R3 prototype, Fallback B passed). At the M2
+  freeze, `docker compose run --rm verifier pytest -q` ran with **zero skips**, so
+  `test_phase2_blocks_network_egress` **executed and passed** under CAP_SYS_ADMIN — the
+  Phase-2 no-egress control is verified locally.
+- GitHub Actions CI: **CONFIRMED GREEN (RM-CI RESOLVED).** All five M2 workflow runs are
+  green on `main` — CI #19 (`d75f641`, pinned env), #20 (`b800394`, two-phase isolation),
+  #21 (`8a8d171`, flake detection), #22 (`baed002`, held-out secondary), #23 (`a315dea`,
+  docs). The isolation-dependent test is permanently capability-gated (runs where
+  CAP_SYS_ADMIN is granted, skip-with-reason otherwise — never silently passed, M2_SPEC
+  §11); the local Docker Desktop run above is the authoritative CAP_SYS_ADMIN acceptance
+  gate. M2 verification gates (M2_SPEC §3/§14) are satisfied.
