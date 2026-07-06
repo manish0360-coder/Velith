@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         timeout_seconds=settings.ollama_timeout_seconds,
     )
     proposer = ProposerAgent(client=client, model=settings.ollama_model)
-    store = EpisodeStore(settings.episode_path)
+    store = EpisodeStore(settings.episode_path, settings.episode_index_path)
 
     try:
         with VerifierSandbox(timeout_seconds=settings.verifier_timeout_seconds) as sandbox:
