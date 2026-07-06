@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     # verifier raises rather than running untrusted code unisolated (D19).
     verifier_network_isolation: bool = True
 
+    # --- M3 settings (indexed episode store; M3_SPEC §6.3) ---
+    # Path to the derived SQLite index over the episode log. The JSONL log
+    # (`episode_path`) stays authoritative; this index is a rebuildable
+    # projection of it (M3_SPEC §4.1-§4.2), consumed from M3-C2 onward. It lives
+    # under the same host-mounted, gitignored `data/episodes/` directory.
+    episode_index_path: Path = Path("data/episodes/episodes.db")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
