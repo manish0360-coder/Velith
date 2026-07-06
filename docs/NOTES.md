@@ -25,3 +25,26 @@ Environment support — record for future contributors:
   CAP_SYS_ADMIN is granted, skip-with-reason otherwise — never silently passed, M2_SPEC
   §11); the local Docker Desktop run above is the authoritative CAP_SYS_ADMIN acceptance
   gate. M2 verification gates (M2_SPEC §3/§14) are satisfied.
+
+## M3 — indexed episode store (freeze)
+
+M3 adds a derived, queryable index over the episode log without touching episode identity
+(M3_SPEC frozen; handoff M3-C1..C5). Record for future contributors:
+
+- **Authority.** The append-only JSONL log (`data/episodes/episodes.jsonl`) is the single source of
+  truth. The SQLite index (`data/episodes/episodes.db`, `VELITH_EPISODE_INDEX_PATH`) is a
+  *rebuildable projection*: if it is ever lost or diverges, delete it and call
+  `EpisodeIndex.rebuild_from_log` — it is never trusted over the log (M3_SPEC §4.1-§4.2). Both files
+  live under the gitignored `data/episodes/`. A store constructed without an index path keeps the
+  exact M1/M2 log-only behaviour, so pre-existing logs read back unchanged.
+- **Two digests, distinct on purpose.** `content_hash` is *identity* and excludes provenance
+  (`timestamp`, `latency_seconds`, `verify_seconds`, `flaky`; D16.1/D21). `record_digest` (held in
+  the index) covers the *full serialized record* and catches corruption of exactly those excluded
+  provenance fields. Reads raise `EpisodeIntegrityError` and `RecordIntegrityError` respectively —
+  never conflate them.
+- **Domain-neutral by contract.** Only neutral fields are indexed; patch, prompt, and source are
+  opaque (D22 / §4.4). This keeps the store reusable for non-software rungs of the D5 ladder — a
+  synthetic non-software episode indexes and queries through the identical path (acceptance test).
+- **Freeze certification.** M3-C1..C5 implemented, Docker-verified, committed and pushed; all four
+  gates (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero
+  M3-attributable skips. Milestone tagged `m3-complete`.

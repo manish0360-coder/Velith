@@ -3,8 +3,8 @@
 **Project:** Velith
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
-**Last updated:** 2026-07-04
-**Current tag:** `m2-complete`
+**Last updated:** 2026-07-06
+**Current tag:** `m3-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -34,6 +34,16 @@ hash, no new verdict state); and a **held-out secondary** suite, re-materialized
 fixture after patch apply, populates the model-gap signal `secondary_passed` (identity — inside the
 hash). Isolation is mandatory: untrusted code is never run unisolated. This was a *hardening, not a
 rewrite* (RK8) — proposer, LLM client, and store are unchanged.
+
+**M3 — complete and certified** (`m3-complete`). The accumulated episodes are now **queryable and
+integrity-checked** with no change to episode identity. The append-only JSONL log remains the single
+source of truth; alongside it the store maintains a **derived SQLite index** — a rebuildable
+projection keyed on neutral, domain-agnostic fields only (`task_id`, verdict `state`, `timestamp`,
+`model`, `seed`, `flaky`, `secondary_passed`, `content_hash`) — plus a **record-level integrity
+digest** distinct from `content_hash` (it covers the full serialized record, identity + provenance,
+M3_SPEC §9). Reads re-verify both digests; the change/`patch`, prompt, and source are never indexed,
+so the store is fully domain-neutral (D22 / §4.4). This was a *storage hardening, not a rewrite*: the
+proposer, LLM client, verifier, and the `Episode` identity schema are unchanged.
 
 ## 2. M1 objectives and achievements
 
@@ -161,13 +171,59 @@ all four gates are green in the container and CI. **Verification evidence:** loc
 `pytest -q` (zero skips -> `test_phase2_blocks_network_egress` executed under `CAP_SYS_ADMIN`) all
 green; GitHub Actions CI #19-#23 green on `main` (RM-CI resolved, see `docs/NOTES.md`).
 
-## 6. Readiness for M3
+## 6. M3 objectives, achievements, and verification
 
-M3 extends **episode storage/indexing** without altering identity (content-hash) fields (M2_SPEC
-§15): an indexed/DB episode store and query surface, and — if required — a separate record-level
-integrity digest distinct from the content hash. The two-phase, pinned, isolated verifier is now the
-durable substrate every later rung reuses; the persisted `flaky` provenance is available to later
-consumers unchanged. No M2 work blocks M3.
+Every M3 engineering goal (M3_SPEC §2/§5, handoff §9) was met, confined to the storage/access seam:
 
-**Repository is M3-ready.** Begin M3 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1 and M2.
+- **Derived, rebuildable index** (M3_SPEC §4.1-§4.2) — a new `episodes/index.py` maintains an embedded
+  SQLite projection of the log, keyed by `content_hash`, with `rebuild_from_log` reconstructing it
+  from the authoritative log alone. The JSONL log stays the single source of truth; the index is
+  never trusted over it.
+- **Domain-neutral query surface** (M3_SPEC §6.2, D22 / §4.4) — typed accessors retrieve episodes by
+  each neutral field (`task_id`, `state`, `timestamp`, `model`, `seed`, `flaky`, `secondary_passed`,
+  `content_hash`) and by time range. No domain field (patch/prompt/source) is indexed.
+- **Record-level integrity digest** (M3_SPEC §9) — each row carries a `record_digest` over the full
+  serialized record, distinct from the identity `content_hash`. Reads raise `EpisodeIntegrityError`
+  on a content-hash mismatch and `RecordIntegrityError` on a record-digest mismatch (e.g. tampering
+  with a provenance field the content hash excludes). Corruption is loud, never silent.
+- **Identity untouched, determinism preserved** (M3_SPEC §5.7 / §8) — index presence changes no
+  `content_hash` and no log line; a varying `flaky` stays inert to identity (D21). The `Episode`
+  identity schema, proposer, LLM client, and verifier are unchanged.
+- **Config** (M3_SPEC §6.3) — the index path is a single validated setting,
+  `VELITH_EPISODE_INDEX_PATH` (default `data/episodes/episodes.db`), under the gitignored
+  `data/episodes/`.
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `4be35af` | feat: episode index path setting (M3-C1) |
+| `8a6c062` | feat: sqlite episode index (derived projection) (M3-C2) |
+| `3b45b56` | feat: dual-write store with record-level integrity digest (M3-C3) |
+| `9def1b5` | test: hermetic m3 store+index acceptance (M3-C4) |
+| `2d2da18` | docs: document indexed episode store (M3-C5) |
+
+
+
+**Definition of Done — all satisfied (M3_SPEC §5, handoff §9).** Existing M1/M2 episodes read back and
+re-hash unchanged (1); append updates log + index, and the index drops and rebuilds from the log to an
+identical state (2); episodes are retrievable by every neutral field and by time range with
+`content_hash` re-verified on read (3); a record-level digest is stored and byte-level corruption is
+detected loudly and distinctly (4); no domain field is indexed and a synthetic non-software episode
+flows through the identical path (5); the categorical verdict is encoded without a binary-only
+worldview and no quantitative field was built (6, D22); the index and digest change no `content_hash`
+and `flaky` stays inert (7); all four gates are green in the container and CI (8). **Verification
+evidence:** local `docker compose run --rm verifier` — `ruff check`, `ruff format --check`,
+`mypy src tests`, `pytest -q` all green across M3-C1..C5; the store/index adds no
+network-isolation-gated test, so `pytest -q` reports zero M3-attributable skips (handoff §7).
+
+## 7. Readiness for M4
+
+M4 is the **dataset loader + mechanically-enforced held-out lock** (D8/D12): real task ingestion and a
+hash-checked exclusion that no arm's memory can cross. The indexed, integrity-checked episode store is
+now the durable substrate M4+ reads and writes; queries by neutral field and time range are available
+to later consumers, and the record digest protects stored experience. The JSONL log stays
+authoritative and the SQLite index remains a rebuildable projection. No M3 work blocks M4.
+
+**Repository is M4-ready.** Begin M4 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1–M3.
