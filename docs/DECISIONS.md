@@ -3,7 +3,7 @@
 **Project:** Velith
 **Document type:** Permanent engineering decision record. This is a *record*, not a discussion. Each entry states a decision that has already been ratified, its rationale, the alternatives that were rejected, and its consequences.
 **Status of this document:** Authoritative. A ratified decision is changed only by a new dated entry that explicitly supersedes the prior one, with justification. Decisions are never edited away silently.
-**Last updated:** 2026-06-20
+**Last updated:** 2026-07-06
 
 **Naming lineage (for the record):** This program was discussed during its review phase under the working names *PrometheusLite* / *Mini Prometheus* (program) and *Noetica* (system). The ratified flagship name is **Velith**. Where earlier internal documents (`VISION.md`, the architecture/cognitive/theory papers) use the older names, they refer to this same project unless explicitly stated otherwise.
 
@@ -48,6 +48,7 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D19 | Two-phase hardened sandbox; isolation mechanism (M2) | Accepted |
 | D20 | M2 explicit out-of-scope set (M2) | Accepted |
 | D21 | `flaky` is provenance, not identity (M2) | Accepted |
+| D22 | Binary decisions control workflow; quantitative measurements drive learning (P4) | Accepted |
 
 ---
 
@@ -408,6 +409,25 @@ M1 verdict states are: `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`, `NO_PATCH` (all
 **Alternatives rejected.** `flaky` inside the content hash (breaks D16.1 reproducibility); `flaky` left unpersisted (loses provenance needed by M5+ memory policies). Full-record tamper-evidence, if ever required, is a separate record-level digest (an M3 storage concern), never the content hash.
 
 **Consequences.** `episodes/episode.py` adds `flaky` to `HASH_EXCLUDED_FIELDS`; a test asserts a varying `flaky` leaves the content hash unchanged.
+
+---
+
+## D22 — Binary decisions control workflow; quantitative measurements drive learning (P4)
+
+**Status:** Accepted. **Date:** 2026-07-06. **(Ratifies P4; binds the M3 episode-store design.)**
+
+**Decision.** Two distinct kinds of signal flow through Velith and must never be conflated:
+
+- **Binary (categorical) decisions control workflow.** The closed verdict taxonomy (D16.7) and the boolean identity/provenance signals (`secondary_passed`, `flaky`) gate what happens next — retain or reject a patch, admit or exclude an episode from memory, pass or fail a gate. Control flow is driven by categorical outcomes, not by magnitudes.
+- **Quantitative measurements drive learning.** Scalar or vector magnitudes — held-out pass-rate deltas, effect sizes, and, on later rungs of the migration ladder (D5), approximate-verifier scores such as SPICE or FEA residuals — inform *how* memory and policy are weighted and *how* the compounding experiment (D6/D8) is evaluated. They tune learning; they do not, by themselves, gate the workflow.
+
+**D3 guard (binding and permanent).** Any quantitative signal admitted as grounded evidence must be a **deterministic verifier output, never a model-produced score**. A number a model emits about its own work is not evidence; it is the model-gap the program exists to eliminate (D2/D3, D11).
+
+**Rationale.** Overloading a closed outcome taxonomy with a magnitude, or letting a magnitude silently gate control flow, reintroduces exactly the confusion verification-first is built to avoid. Keeping the two channels separate keeps control flow crisp and auditable while leaving learning free to consume rich, graded, *grounded* signal. Concretely for storage: the episode store must be **outcome-representation-flexible** — it records the categorical verdict that governs control flow today, and must not foreclose a future deterministic quantitative measurement field that later milestones will use for learning. Fixing the store to a binary-only worldview now would force a schema-breaking migration later.
+
+**Alternatives rejected.** A single scored verdict that collapses measurement into the categorical outcome (reintroduces the model-gap D3 forbids and burdens a closed taxonomy). Admitting any model-emitted number as evidence (violates D2/D3). Pre-building the quantitative field now (premature; expands scope before a milestone requires it — see Consequences).
+
+**Consequences.** The M3 episode store (D12/D16.6) is kept outcome-representation-flexible: it indexes only neutral, domain-agnostic fields and makes no design choice that would foreclose a *future, additive, non-identity, deterministic* quantitative field. That field is **not built in M3** — it is added only when a milestone requires it. The D3 guard binds any such field permanently, on every rung of the ladder.
 
 ---
 

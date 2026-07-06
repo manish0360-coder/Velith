@@ -33,3 +33,9 @@ htmlcov/
 
 # Generated episode store (M1) — grounded experience data, never tracked (handoff §4.10)
 /data/episodes/
+
+# Node / Next.js (web app alongside the Python project)
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
