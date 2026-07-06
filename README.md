@@ -233,3 +233,51 @@ with the held-out check. Unlike `flaky`, `secondary_passed` is part of episode i
 
 - `VELITH_VERIFIER_NETWORK_ISOLATION` — isolate the test step (default `true`).
 - `VELITH_FLAKE_RERUN_COUNT` — primary-test reruns for flake detection (default `3`).
+
+## M3 — the indexed episode store
+
+M3 makes the accumulated episodes **queryable and durable** without changing what an
+episode *is*. The append-only JSONL log stays the single source of truth; alongside it
+the store maintains a **derived SQLite index** that is a *rebuildable projection* of the
+log — it can be deleted and reconstructed from the log at any time, and is never trusted
+over it. Episode identity (the `content_hash`) is untouched.
+
+### Query surface
+
+Episodes are indexed on **neutral, domain-agnostic fields only** — `task_id`, verdict
+`state`, `timestamp`, `model`, `seed`, `flaky`, `secondary_passed`, and `content_hash` —
+and are retrievable by each of those fields and by time range. The change/`patch`, the
+prompt, and any source are **never indexed**: the store carries no knowledge of the
+engineering domain, so a non-software episode is indexed and queried through the exact
+same path.
+
+### Record-level integrity digest
+
+Each indexed row also carries a `record_digest`: a SHA-256 over the **full serialized
+record** (identity *and* provenance). It is distinct from the `content_hash`, which
+covers identity only and deliberately excludes provenance (`timestamp`,
+`latency_seconds`, `verify_seconds`, `flaky`). On read, the store re-verifies both — a
+`content_hash` mismatch raises `EpisodeIntegrityError`, and a record-digest mismatch (for
+example, tampering with a provenance field the content hash excludes) raises
+`RecordIntegrityError`. Corruption is loud, never silent.
+
+### Rebuilding the index
+
+Because the index is a projection, it can always be rebuilt from the authoritative log:
+
+```python
+from pathlib import Path
+from velith.episodes.index import EpisodeIndex
+
+with EpisodeIndex(Path("data/episodes/episodes.db")) as index:
+    index.rebuild_from_log(Path("data/episodes/episodes.jsonl"))
+```
+
+A store constructed without an index path keeps the exact M1/M2 log-only behaviour, so
+existing logs remain readable unchanged.
+
+### Relevant settings
+
+- `VELITH_EPISODE_INDEX_PATH` — location of the derived SQLite index (default
+  `data/episodes/episodes.db`, under the same gitignored `data/episodes/` directory as
+  the log).
