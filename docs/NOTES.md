@@ -48,3 +48,28 @@ M3 adds a derived, queryable index over the episode log without touching episode
 - **Freeze certification.** M3-C1..C5 implemented, Docker-verified, committed and pushed; all four
   gates (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero
   M3-attributable skips. Milestone tagged `m3-complete`.
+
+## M4 — task corpus and held-out lock (freeze)
+
+M4 adds a domain-neutral corpus layer without touching any M0–M3 contract (M4_SPEC frozen under D23;
+handoff M4-C1..C6). Record for future contributors:
+
+- **Domain-neutral by contract.** A task is an opaque `material` (identity content) plus an opaque
+  verification `handle`; the loader and lock never inspect either. Identity is a SHA-256 of the
+  material, independent of the mutable display label — so relabeling cannot move a task across the
+  partition (M4_SPEC §3.3). This keeps the corpus reusable for non-software rungs of the D5 ladder.
+- **The manifest freezes the split.** The content-addressed manifest maps identity →
+  `available`/`held_out` and carries a stable `manifest_hash`: same split → same hash, changed split →
+  new hash. A concrete real-dataset source (e.g. SWE-bench) is a registered adapter conforming to the
+  neutral loader contract — not built in M4 (M4_SPEC §3.2/§6).
+- **One guarded chokepoint.** `GuardedEpisodeWriter` is the only experience-path writer into the frozen
+  `EpisodeStore`: it delegates available-task episodes byte-for-byte and raises `HeldOutError` on a
+  held-out or unknown identity (fail-closed, D8). The frozen store is composed, never modified — proven
+  by a byte-identity acceptance test.
+- **Settings note.** The loader consumes `VELITH_CORPUS_PATH` and `VELITH_CORPUS_PARTITION_SPEC_PATH`;
+  `VELITH_CORPUS_MANIFEST_PATH` is declared as the manifest location, and in M4 the manifest is produced
+  in-memory (`LoadedCorpus.manifest`) — persistence to that path is left to a later milestone.
+- **Freeze certification.** M4-C1..C6 implemented, Docker-verified, committed and pushed; all four
+  gates (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero
+  M4-attributable skips. Milestone tagged `m4-complete`. Future principles D24/D25 recorded, not
+  implemented (D23).

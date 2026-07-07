@@ -4,7 +4,7 @@
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
 **Last updated:** 2026-07-06
-**Current tag:** `m3-complete`
+**Current tag:** `m4-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -44,6 +44,16 @@ digest** distinct from `content_hash` (it covers the full serialized record, ide
 M3_SPEC §9). Reads re-verify both digests; the change/`patch`, prompt, and source are never indexed,
 so the store is fully domain-neutral (D22 / §4.4). This was a *storage hardening, not a rewrite*: the
 proposer, LLM client, verifier, and the `Episode` identity schema are unchanged.
+
+**M4 — complete and certified** (`m4-complete`). The loop is lifted from one fixture task to a
+**corpus** under a **mechanically-enforced held-out lock** that no experience path can cross (D8). A
+domain-neutral loader materializes many `CorpusTask` values — each an opaque *material* and
+*verification handle* the loader never inspects — labeled with a partition (`available` | `held_out`)
+drawn from a **content-addressed manifest** whose stable hash freezes the split. The `HeldOutLock`
+(keyed on content-addressed identity, so relabeling cannot cross) and a single **guarded persistence
+boundary** compose the frozen M3 store: available-task episodes are delegated byte-for-byte unchanged,
+while a held-out or unknown task raises `HeldOutError` (fail-closed). This was *composition, not a
+rewrite* — no M0–M3 contract was modified.
 
 ## 2. M1 objectives and achievements
 
@@ -217,13 +227,62 @@ evidence:** local `docker compose run --rm verifier` — `ruff check`, `ruff for
 `mypy src tests`, `pytest -q` all green across M3-C1..C5; the store/index adds no
 network-isolation-gated test, so `pytest -q` reports zero M3-attributable skips (handoff §7).
 
-## 7. Readiness for M4
+## 7. M4 objectives, achievements, and verification
 
-M4 is the **dataset loader + mechanically-enforced held-out lock** (D8/D12): real task ingestion and a
-hash-checked exclusion that no arm's memory can cross. The indexed, integrity-checked episode store is
-now the durable substrate M4+ reads and writes; queries by neutral field and time range are available
-to later consumers, and the record digest protects stored experience. The JSONL log stays
-authoritative and the SQLite index remains a rebuildable projection. No M3 work blocks M4.
+Every M4 engineering goal (M4_SPEC §2/§8, handoff §9) was met, confined to a new domain-neutral corpus
+layer composed onto the frozen store:
 
-**Repository is M4-ready.** Begin M4 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1–M3.
+- **Content-addressed partition manifest** (M4_SPEC §3.1) — `corpus/manifest.py` maps each
+  content-addressed task identity to exactly one partition (`available` | `held_out`) and exposes a
+  stable `manifest_hash` that is identical for the same split and changes iff the split changes.
+  Identity is a hash of opaque material, independent of the mutable display label.
+- **Domain-neutral corpus loader** (M4_SPEC §3.2) — `corpus/loader.py` materializes many `CorpusTask`
+  values from a corpus source, each labeled with its partition from the manifest; materials and the
+  verification handle are opaque (carried verbatim, never parsed). `task.py` is unmodified; a
+  non-software corpus loads through the identical path.
+- **Held-out lock + guarded persistence boundary** (M4_SPEC §3.3 / §4) — `corpus/heldout.py` provides
+  the single authoritative exclusion predicate (`HeldOutLock`) and the single guarded writer
+  (`GuardedEpisodeWriter`) into the frozen `EpisodeStore`: available-task episodes are delegated
+  byte-for-byte unchanged; a held-out task or an identity absent from the manifest raises
+  `HeldOutError` (fail-closed). Mechanical enforcement at one chokepoint, never convention.
+- **Composition, not modification** — the frozen episode schema, store, index, task type, verifier,
+  LLM client, and orchestrator are untouched; the only M0–M3 change is additive `core/config.py`
+  settings. Future principles D24/D25 are recorded but not implemented (D23).
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `aa9ac62` | feat: corpus and partition settings (M4-C1) |
+| `24c6a5b` | feat: content-addressed corpus manifest (M4-C2) |
+| `45c584e` | feat: domain-neutral task corpus loader (M4-C3) |
+| `960661b` | feat: held-out lock and guarded persistence (M4-C4) |
+| `98fd3b2` | test: verify M4 corpus integration (M4-C5) |
+| `11d132b` | docs: document M4 task corpus and held-out lock (M4-C6) |
+
+The M4 specification freeze (D23–D25) is recorded separately in commit `a9bce19`.
+
+**Definition of Done — all satisfied (M4_SPEC §2/§8, handoff §9).** A corpus of many tasks loads into
+domain-neutral values without the loader inspecting materials or the handle (1); every task carries a
+partition label assigned deterministically by the content-addressed manifest (2); the held-out lock's
+predicate is authoritative and content-addressed, robust to relabeling (3); the single guarded boundary
+refuses held-out and unknown identities and delegates available-task episodes to the frozen store
+byte-identically (4); the partition is frozen by a manifest hash that is stable and changes iff the
+split changes (5); a synthetic non-software corpus loads, partitions, and locks through the identical
+path (6); no frozen M0–M3 file is modified and the only `core/config.py` change is additive (7); all
+four gates are green in the container and CI (8). **Verification evidence:** `docker compose run --rm
+verifier` — `ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q` all green across
+M4-C1..C6; M4 adds no network-isolation-gated test, so `pytest -q` reports zero M4-attributable skips
+(handoff §7).
+
+## 8. Readiness for M5
+
+M5 is the **batch runner + cold baseline arm A0** (D7/D12): sweep the corpus through
+propose → verify → log at scale, writing only through the guarded persistence boundary so held-out
+experience can never leak. The corpus loader, content-addressed manifest, and held-out lock are now the
+durable inputs M5 orchestrates over the frozen, integrity-checked episode store. The JSONL log stays
+authoritative, the index a rebuildable projection, and the held-out partition mechanically enforced.
+No M4 work blocks M5.
+
+**Repository is M5-ready.** Begin M5 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1–M4.
