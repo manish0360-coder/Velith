@@ -49,6 +49,9 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D20 | M2 explicit out-of-scope set (M2) | Accepted |
 | D21 | `flaky` is provenance, not identity (M2) | Accepted |
 | D22 | Binary decisions control workflow; quantitative measurements drive learning (P4) | Accepted |
+| D23 | M4 architecture frozen as written; Scientific-Review enhancements deferred (M4) | Accepted |
+| D24 | Future Principle A — engineering-task decomposition (InitialState/Context/Objective) | Accepted (future guidance — deferred) |
+| D25 | Future Principle B — held-out evolves toward distance-based exclusion | Accepted (future guidance — deferred) |
 
 ---
 
@@ -428,6 +431,48 @@ M1 verdict states are: `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`, `NO_PATCH` (all
 **Alternatives rejected.** A single scored verdict that collapses measurement into the categorical outcome (reintroduces the model-gap D3 forbids and burdens a closed taxonomy). Admitting any model-emitted number as evidence (violates D2/D3). Pre-building the quantitative field now (premature; expands scope before a milestone requires it — see Consequences).
 
 **Consequences.** The M3 episode store (D12/D16.6) is kept outcome-representation-flexible: it indexes only neutral, domain-agnostic fields and makes no design choice that would foreclose a *future, additive, non-identity, deterministic* quantitative field. That field is **not built in M3** — it is added only when a milestone requires it. The D3 guard binds any such field permanently, on every rung of the ladder.
+
+---
+
+## D23 — M4 architecture frozen as written; Scientific-Review enhancements deferred
+
+**Status:** Accepted. **Date:** 2026-07-06. **(Freezes `docs/M4_SPEC.md`.)**
+
+**Decision.** `docs/M4_SPEC.md` is ratified and **frozen exactly as written**. M4 ships the minimal domain-neutral **task corpus loader** plus the **mechanically-enforced, identity-based held-out lock**, composed onto the frozen M3 store — and nothing more. The two enhancements raised in M4 Scientific Review are recorded below as **D24** and **D25**; they are valuable long-term guidance but are **not implemented in M4**, because doing so would introduce abstraction ahead of a demonstrated need, which D12 (implementation-first roadmap) and D15 (deliberate postponement) forbid.
+
+**Rationale.** The freeze protects the no-premature-abstraction discipline at the exact moment it is under pressure: a reviewer's good idea is the most common source of scope creep. M4's job is to make the loop corpus-scale and generalization-honest with the smallest possible domain-neutral surface; both deferred principles are gated on a multi-domain need that does not exist at M4 (the first vertical is software alone, D4). Recording them now preserves the insight without paying its cost early.
+
+**Alternatives rejected.** Folding the task decomposition (D24) or distance-based held-out (D25) into M4 — premature abstraction that a single (software) domain cannot validate, expanding M4 scope and risk. Re-opening the ratified M4 architecture — the specification passed Scientific Review and the Research Director ordered it frozen as written.
+
+**Consequences.** The M4 implementation handoff is extracted from the frozen `M4_SPEC.md` unchanged. D24 and D25 remain **future guidance** until their triggering conditions occur, at which point each is promoted to a build constraint by a **new dated decision** (the amendment procedure), never by silently reinterpreting M4. D12 and D15 are preserved and reinforced. See [[D15]].
+
+---
+
+## D24 — Future Principle A: engineering-task decomposition (InitialState / Context / Objective)
+
+**Status:** Accepted as **FUTURE GUIDANCE — deferred**. **Not a build constraint for M4 or any current milestone.** **Date:** 2026-07-06.
+
+**Decision.** In the future, an engineering task's identity/material should decompose into three explicit parts — **InitialState**, **Context**, and **Objective**. This decomposition is introduced **only when multiple engineering domains** (software, electronics, CAD, manufacturing) actually require a shared task representation. It is expressly **not** an M4 build constraint: M4 treats a task's materials and its verification handle as **opaque** (D9, D22, M4_SPEC §3.2/§4), and the current single-domain context (D4) does not justify the structure.
+
+**Rationale.** The tri-part decomposition is the natural **domain-neutral** shape a task takes once heterogeneous domains must share one representation — an initial artifact/state, the surrounding constraints, and the target to be verified. Introducing it before that need exists is premature abstraction (D12/D15): software alone cannot validate a structure whose whole purpose is cross-domain generality, and building it early risks fitting later domains to a possibly-wrong shape.
+
+**Alternatives rejected.** Building the decomposition into M4's corpus/task representation now (premature; unvalidated by a single domain; expands scope). Discarding the idea (loses durable long-term guidance the record exists to keep).
+
+**Consequences.** When a milestone first requires **≥ 2 engineering domains** to share task representation (a D5 rung beyond software), this principle is the ratified starting point and is promoted to a build constraint then, via a new dated decision. Until that trigger, the opaque-materials contract (D9/D22) stands and M4 remains as frozen. See [[D15]], [[D23]].
+
+---
+
+## D25 — Future Principle B: held-out evolves from identity exclusion toward distance-based exclusion
+
+**Status:** Accepted as **FUTURE GUIDANCE — deferred**. **Not a build constraint for M4 or any current milestone.** **Date:** 2026-07-06.
+
+**Decision.** In the future, held-out evaluation should evolve from **identity-based exclusion** toward **state-space or parameter-space distance** exclusion **where appropriate** — specifically for **continuous** engineering domains (CAD, FEA, robotics, manufacturing), where near-duplicates in a continuous space can defeat identity exclusion. The **current identity-based held-out lock is correct and sufficient for M4** (M4_SPEC §3.3): M4's corpus is discrete and content-addressed, so exact identity exclusion fully enforces the D8 anti-Goodhart guarantee.
+
+**Rationale.** Identity exclusion is exact for discrete tasks; continuous domains admit near-duplicate leakage that only a distance metric detects. But a distance criterion requires a **domain-specific** state/parameter space that does not exist at M4 and cannot be validated on software — adding it now would be premature abstraction (D12/D15) **and** would inject the very domain-specific assumption M4's architecture forbids.
+
+**Alternatives rejected.** Implementing distance-based exclusion in M4 (premature; no continuous domain present; violates M4 domain-neutrality). Weakening the identity lock now (unnecessary and unsafe — it would trade an exact guarantee for an unvalidated heuristic).
+
+**Consequences.** When a continuous engineering domain enters the corpus (a D5 rung beyond software), the held-out lock is **extended** with a distance-based criterion via a new dated decision, preserving the exact identity-based path for discrete domains. The invariant both mechanisms must satisfy is D8's: held-out experience never leaks into any arm's memory. See [[D8]], [[D15]], [[D23]].
 
 ---
 
