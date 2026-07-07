@@ -281,3 +281,64 @@ existing logs remain readable unchanged.
 - `VELITH_EPISODE_INDEX_PATH` — location of the derived SQLite index (default
   `data/episodes/episodes.db`, under the same gitignored `data/episodes/` directory as
   the log).
+
+## M4 — the task corpus and held-out lock
+
+M4 lifts the loop from one fixture task to a **corpus**, under a mechanically-enforced
+held-out partition that no experience path can cross. It is **domain-neutral**: a task is
+an opaque *material* (its identity content) plus an opaque *verification handle*, and the
+corpus layer never inspects either. Nothing about M0–M3 changes — M4 composes the frozen
+episode store.
+
+### Corpus loader
+
+`load_corpus(corpus_path, partition_spec_path)` reads a neutral corpus source (a
+`corpus.json` of task descriptors) and a declared partition specification, and returns a
+`LoadedCorpus`: the partitioned `CorpusTask` values and the content-addressed manifest.
+Each task carries a `label` (display id), an opaque `material`, an opaque `handle`, and its
+`partition` — assigned **from the manifest**, never from the mutable label. Materials and
+handles are carried verbatim; the loader parses no diff/test/domain content, so a
+non-software corpus loads through the identical path. A concrete real-dataset adapter
+(e.g. SWE-bench) is a registration conforming to this contract and is outside M4 scope.
+
+### Content-addressed partition and its hash
+
+A task's **identity** is a SHA-256 over its opaque material, independent of the mutable
+display label — so renaming a task cannot move it across the partition. The manifest maps
+identity → partition (`available` | `held_out`) and exposes a stable `manifest_hash` over
+that assignment: identical for the same split, and different the moment the split changes.
+This freezes the split reproducibly.
+
+### Held-out lock and guarded persistence boundary
+
+`HeldOutLock` is the single authoritative exclusion predicate, keyed on content-addressed
+identity. `GuardedEpisodeWriter` is the **only** experience-path writer into the frozen
+episode store: `persist(identity, episode)` delegates an available task's episode to the
+store unchanged (byte-for-byte identical to a direct append), and raises `HeldOutError` for
+a held-out task or for an identity absent from the manifest (**fail-closed**). Enforcement
+is a raised error at one chokepoint — mechanical, never convention.
+
+```python
+from pathlib import Path
+
+from velith.corpus.heldout import GuardedEpisodeWriter, HeldOutLock
+from velith.corpus.loader import load_corpus
+from velith.episodes.store import EpisodeStore
+
+loaded = load_corpus(Path("data/corpus"), Path("data/corpus/partition.json"))
+store = EpisodeStore(Path("data/episodes/episodes.jsonl"), Path("data/episodes/episodes.db"))
+writer = GuardedEpisodeWriter(HeldOutLock(loaded.manifest), store)
+
+# writer.persist(task.identity, episode): an available task is stored unchanged;
+# a held-out or unknown task raises HeldOutError (fail-closed).
+```
+
+### Relevant settings
+
+- `VELITH_CORPUS_PATH` — root of the task corpus source (default `data/corpus`); read by
+  the loader.
+- `VELITH_CORPUS_PARTITION_SPEC_PATH` — the declared partition specification (default
+  `data/corpus/partition.json`); read by the loader.
+- `VELITH_CORPUS_MANIFEST_PATH` — location for the content-addressed manifest (default
+  `data/corpus/manifest.json`). In M4 the manifest is produced in-memory by the loader
+  (`LoadedCorpus.manifest`).
