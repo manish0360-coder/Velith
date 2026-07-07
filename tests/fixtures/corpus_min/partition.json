@@ -1,0 +1,5 @@
+{
+  "part:bracket;holes:4;units:mm": "available",
+  "part:gear;teeth:18;module:1.5": "held_out",
+  "part:panel;slots:3;units:mm": "available"
+}

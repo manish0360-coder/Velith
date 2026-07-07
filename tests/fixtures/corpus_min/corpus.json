@@ -1,0 +1,5 @@
+[
+  {"label": "bracket-v1", "material": "part:bracket;holes:4;units:mm", "handle": "fixture-fits"},
+  {"label": "gear-v2", "material": "part:gear;teeth:18;module:1.5", "handle": "meshes-clean"},
+  {"label": "panel-v1", "material": "part:panel;slots:3;units:mm", "handle": "clears-envelope"}
+]
