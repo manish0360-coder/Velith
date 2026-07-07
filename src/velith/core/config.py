@@ -90,6 +90,20 @@ class Settings(BaseSettings):
     # split) from which the manifest is materialized; consumed by the manifest (M4-C2).
     corpus_partition_spec_path: Path = Path("data/corpus/partition.json")
 
+    # --- M5 settings (batch runner + cold baseline arm A0; M5_SPEC §3.4/§3.5) ---
+    # The fixed base model for a batch sweep (one non-saturating model; D8 §1). Recorded
+    # in the run provenance as part of the experiment identity; consumed from M5-C2/C3.
+    batch_base_model: str = "qwen2.5-coder"
+    # The run's batch seed. Each task's seed is deterministically derived from
+    # (task identity, batch seed) in M5-C2; recorded in the run provenance.
+    batch_seed: int = 0
+    # Cost-guard limits (M5_SPEC §3.4) — deterministic resource bounds enforced by the
+    # guard in M5-C3 and recorded as experiment identity; `0` means "unbounded". Per-step
+    # timeouts reuse `ollama_timeout_seconds` / `verifier_timeout_seconds`.
+    batch_max_tasks: int = 0
+    batch_max_attempts_per_task: int = 1
+    batch_max_tokens: int = 0
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
