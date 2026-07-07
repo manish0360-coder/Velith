@@ -76,6 +76,20 @@ class Settings(BaseSettings):
     # under the same host-mounted, gitignored `data/episodes/` directory.
     episode_index_path: Path = Path("data/episodes/episodes.db")
 
+    # --- M4 settings (task corpus + held-out lock; M4_SPEC §5) ---
+    # Path-only locators for the corpus and its partition. These declare *where*
+    # the inputs live; no partition logic lives here (that is the manifest and
+    # loader, M4-C2/M4-C3). Each has a safe default so the system still loads with
+    # no `.env` (M0 invariant).
+    # Root of the task corpus source (opaque task materials); read by the loader (M4-C3).
+    corpus_path: Path = Path("data/corpus")
+    # Content-addressed partition manifest (available/held-out assignment + hash);
+    # written and read by the manifest (M4-C2) and consulted by the loader (M4-C3).
+    corpus_manifest_path: Path = Path("data/corpus/manifest.json")
+    # The declared partition specification (the pre-committed available/held-out
+    # split) from which the manifest is materialized; consumed by the manifest (M4-C2).
+    corpus_partition_spec_path: Path = Path("data/corpus/partition.json")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
