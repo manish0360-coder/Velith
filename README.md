@@ -342,3 +342,92 @@ writer = GuardedEpisodeWriter(HeldOutLock(loaded.manifest), store)
 - `VELITH_CORPUS_MANIFEST_PATH` — location for the content-addressed manifest (default
   `data/corpus/manifest.json`). In M4 the manifest is produced in-memory by the loader
   (`LoadedCorpus.manifest`).
+
+## M5 — the batch runner and the cold baseline arm (A0)
+
+M5 lifts the loop from one task to a **batch sweep** over the corpus, recording the **cold
+baseline arm (A0)** — the no-memory baseline the compounding experiment measures against.
+M5 is composition, not a rewrite: it orchestrates the frozen proposer, verifier, and
+episode store over the frozen M4 corpus, and it persists **only** through the frozen M4
+guarded persistence boundary, so held-out experience can never leak at scale.
+
+### The sweep (`run_batch`)
+
+`run_batch` draws the corpus's **available** tasks and drives each through
+`propose → verify → log`, tagging every episode with the cold arm `A0`. It accepts its
+collaborators by injection, so it is hermetically testable. Held-out tasks are skipped and,
+as a second line of defence, the guarded boundary refuses any held-out or unknown identity
+(fail-closed). Each episode is persisted through that single boundary — the frozen episode
+store is never written directly.
+
+```python
+from pathlib import Path
+
+from velith.batch.adapter import FixtureTaskAdapter
+from velith.batch.budget import CostGuard
+from velith.batch.provenance import RunProvenance
+from velith.batch.runner import COLD_ARM, run_batch
+from velith.corpus.heldout import GuardedEpisodeWriter, HeldOutLock
+from velith.corpus.loader import load_corpus
+from velith.episodes.store import EpisodeStore
+
+loaded = load_corpus(Path("data/corpus"), Path("data/corpus/partition.json"))
+store = EpisodeStore(Path("data/episodes/episodes.jsonl"), Path("data/episodes/episodes.db"))
+provenance = RunProvenance(
+    corpus_manifest_hash=loaded.manifest.manifest_hash,
+    arm=COLD_ARM,
+    base_model="qwen2.5-coder",
+    batch_seed=0,
+    max_tasks=0,
+    max_attempts_per_task=1,
+    max_tokens=0,
+)
+# episodes = run_batch(loaded, provenance, proposer=..., verifier=...,
+#                      writer=GuardedEpisodeWriter(HeldOutLock(loaded.manifest), store),
+#                      adapter=FixtureTaskAdapter(), guard=CostGuard(0, 1, 0),
+#                      velith_version=...)
+```
+
+### Deterministic per-task seeding
+
+Each task's seed is a deterministic function of its **content-addressed identity** and the
+run's **batch seed** (`derive_task_seed(task_identity, batch_seed)`), so a task's evaluation
+is identical across experimental arms regardless of execution order or retries.
+
+### Cost guard
+
+The sweep is bounded by a hard, deterministic **cost guard** (`CostGuard`) over the
+configured limits — max tasks, attempts per task, and a cumulative token budget (`0` means
+unbounded). It admits work strictly below each limit and **halts the sweep loudly**
+(`CostBudgetError`) at a limit, never writing a partial or misleading episode.
+
+### Task-materialization adapter
+
+The runner never inspects task materials. A domain-neutral **adapter** (`TaskAdapter`)
+materializes, from a `CorpusTask`, the verifiable frozen `Task` the proposer and verifier
+consume. The reference adapter (`FixtureTaskAdapter`) materializes the single fixture task
+(D16.3); a concrete real-dataset adapter (e.g. SWE-bench) is a registration behind the same
+interface and is not built in M5.
+
+### Run provenance
+
+Every sweep is identified by a `RunProvenance` record — its **experiment identity**: the
+corpus manifest hash, the arm, the base-model identity, the batch seed, and the cost-guard
+budget/limits. It is emitted to the structured log at the start of a run.
+
+### Base model and live acceptance
+
+M5 binds a single fixed base model (`FixedBaseModel`); multi-model routing is not built.
+CI stays hermetic — the batch tests inject a mocked proposer and a stub verifier, touching
+no model and no network. A bounded **live** sweep (real proposer and verifier) is the
+documented local acceptance step, exactly as in M1.
+
+### Relevant settings
+
+- `VELITH_BATCH_BASE_MODEL` — the single fixed base model for a sweep (default
+  `qwen2.5-coder`).
+- `VELITH_BATCH_SEED` — the run's batch seed; each task's seed derives from
+  `(task identity, batch seed)`.
+- `VELITH_BATCH_MAX_TASKS`, `VELITH_BATCH_MAX_ATTEMPTS_PER_TASK`, `VELITH_BATCH_MAX_TOKENS` —
+  the cost-guard limits (`0` means unbounded). Per-step timeouts reuse the existing
+  `VELITH_OLLAMA_TIMEOUT_SECONDS` / `VELITH_VERIFIER_TIMEOUT_SECONDS`.
