@@ -4,7 +4,7 @@
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
 **Last updated:** 2026-07-06
-**Current tag:** `m4-complete`
+**Current tag:** `m5-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -54,6 +54,17 @@ drawn from a **content-addressed manifest** whose stable hash freezes the split.
 boundary** compose the frozen M3 store: available-task episodes are delegated byte-for-byte unchanged,
 while a held-out or unknown task raises `HeldOutError` (fail-closed). This was *composition, not a
 rewrite* — no M0–M3 contract was modified.
+
+**M5 — complete and certified** (`m5-complete`). The loop is lifted from one task to a **batch sweep**
+over the corpus, recording the **cold baseline arm (A0)** — the no-memory baseline the compounding
+experiment measures against (D6/D7). A new `batch` layer draws the corpus's **available** tasks, drives
+each through `propose → verify → log`, and persists every episode **only** through the frozen M4 guarded
+boundary (held-out can never leak). Each task's seed is a deterministic function of its content-addressed
+identity and the run's batch seed (identical across arms regardless of order or retries); the sweep is
+bounded by a hard **cost guard**; and a **run-provenance** record captures the experiment identity —
+corpus manifest hash, arm, base model, batch seed, and the cost-guard budget/limits. Domain specifics
+live behind a neutral task-materialization adapter. This was *composition, not a rewrite* — no M0–M4
+contract was modified.
 
 ## 2. M1 objectives and achievements
 
@@ -275,14 +286,63 @@ verifier` — `ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`
 M4-C1..C6; M4 adds no network-isolation-gated test, so `pytest -q` reports zero M4-attributable skips
 (handoff §7).
 
-## 8. Readiness for M5
+## 8. M5 objectives, achievements, and verification
 
-M5 is the **batch runner + cold baseline arm A0** (D7/D12): sweep the corpus through
-propose → verify → log at scale, writing only through the guarded persistence boundary so held-out
-experience can never leak. The corpus loader, content-addressed manifest, and held-out lock are now the
-durable inputs M5 orchestrates over the frozen, integrity-checked episode store. The JSONL log stays
-authoritative, the index a rebuildable projection, and the held-out partition mechanically enforced.
-No M4 work blocks M5.
+Every M5 engineering goal (M5_SPEC §2/§6, handoff §9) was met, confined to a new domain-neutral `batch`
+layer composed onto the frozen substrate:
 
-**Repository is M5-ready.** Begin M5 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1–M4.
+- **Batch runner, cold arm A0** (M5_SPEC §3.1/§3.2) — `batch/runner.py` sweeps the available partition,
+  drives each task through the frozen proposer → verifier, tags every episode `arm = A0`, and persists
+  **only** through the frozen `GuardedEpisodeWriter`. Held-out tasks are skipped and independently
+  refused by the boundary (fail-closed). Collaborators are injected, so the sweep is hermetically
+  testable; the M1 spike remains the frozen single-task reference.
+- **Deterministic per-task seeding** (M5_SPEC §3.5) — `batch/provenance.py` derives each task's seed
+  from its content-addressed identity and the batch seed, so evaluation is identical across arms
+  regardless of execution order or retries.
+- **Cost guard** (M5_SPEC §3.4) — `batch/budget.py` bounds the sweep by deterministic limits (max
+  tasks, attempts, tokens; `0` unbounded), admitting work strictly below each limit and halting loudly
+  (`CostBudgetError`) at it, never writing a partial episode.
+- **Task-materialization adapter** (M5_SPEC §3.3) — `batch/adapter.py` materializes a verifiable frozen
+  `Task` from an opaque `CorpusTask`; the reference adapter is the single fixture (D16.3); real-dataset
+  adapters remain deferred registrations.
+- **Run provenance and fixed base model** (M5_SPEC §3.4/§3.5) — the `RunProvenance` experiment identity
+  (corpus manifest hash, arm, base model, batch seed, cost-guard budget/limits) is emitted to the log;
+  `batch/model.py` binds one fixed base model (no routing).
+- **Composition, not modification** — the frozen episode schema, store, index, task type, verifier, LLM
+  client, corpus layer, and the M1 spike are untouched; the only M0–M4 change is additive
+  `core/config.py` settings. Future principles D24/D25 are recorded but not implemented (D23).
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `ee2de93` | feat: batch run settings (M5-C1) |
+| `e31da38` | feat: deterministic batch provenance (M5-C2) |
+| `1358e14` | feat: cost guard and fixed model seam (M5-C3) |
+| `97b467f` | feat: task materialization adapter seam (M5-C4) |
+| `ebe0336` | feat: batch runner arm A0 (M5-C5) |
+| `407c46c` | test: verify batch runner arm A0 (M5-C6) |
+| `73561bd` | docs: document batch runner and cold baseline arm (M5-C7) |
+
+**Definition of Done — all satisfied (M5_SPEC §6, handoff §9).** The runner sweeps the available
+partition end to end, one episode per task, each persisted through the guarded boundary tagged arm A0
+(1); held-out is never attempted or persisted (2); A0 is cold and deterministically seeded, independent
+of order and retries (3); the cost guard halts the sweep loudly without a partial episode (4); the run
+provenance records the full experiment identity including the cost-guard budget/limits (5); a synthetic
+non-software corpus sweeps through the identical path (6); no frozen M0–M4 file is modified and the only
+`core/config.py` change is additive (7); all four gates are green in the container and CI, with the
+runner tests injecting a mocked proposer and stub verifier so there are zero M5-attributable skips and
+the bounded live sweep is the documented local acceptance step (8, D16.2).
+
+## 9. Readiness for M6
+
+M6 is the **shared retrieval substrate** (D6/D7/D12): the memory the verified/unfiltered write-filter
+arms (M7) will read, holding the retriever/embedder/top-k identical across A1 and A2 so grounding is the
+only manipulated variable (D7). The batch runner, cold baseline A0, deterministic seeding, cost guard,
+and run provenance are now the durable substrate M6+ builds on; A0 remains the memoryless baseline the
+compounding experiment measures against. The JSONL log stays authoritative, the index a rebuildable
+projection, the held-out partition mechanically enforced, and every experience write passes the single
+guarded boundary. No M5 work blocks M6.
+
+**Repository is M6-ready.** Begin M6 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1–M5.

@@ -73,3 +73,32 @@ handoff M4-C1..C6). Record for future contributors:
   gates (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero
   M4-attributable skips. Milestone tagged `m4-complete`. Future principles D24/D25 recorded, not
   implemented (D23).
+
+## M5 — batch runner and cold baseline arm A0 (freeze)
+
+M5 adds a domain-neutral `batch` layer without touching any M0–M4 contract (M5_SPEC frozen; handoff
+M5-C1..C7). Record for future contributors:
+
+- **One guarded write path.** The batch runner persists episodes **only** through the frozen M4
+  `GuardedEpisodeWriter`; it never calls the store directly. Held-out is skipped by the partition filter
+  and independently refused by the boundary (fail-closed, D8). This is the load-bearing invariant that
+  keeps held-out from leaking at scale.
+- **A0 is cold; seeding is deterministic.** The cold baseline arm reads and writes no memory. Each
+  task's seed is `derive_task_seed(task_identity, batch_seed)` — a pure function, so a task's evaluation
+  is identical across arms regardless of execution order or retries (D8/D16.1). A0 is the memoryless
+  baseline the compounding experiment measures against.
+- **Cost guard is the sweep's bound.** `CostGuard` enforces deterministic limits (max tasks, attempts,
+  tokens; `0` unbounded), admits work strictly below each limit, and halts loudly (`CostBudgetError`)
+  without writing a partial episode. The budget/limits are recorded in the run provenance as part of the
+  experiment identity.
+- **Domain specifics live behind the adapter.** The runner inspects no materials; `TaskAdapter`
+  materializes a verifiable frozen `Task` from an opaque `CorpusTask`. The reference adapter is the
+  single fixture (D16.3); a concrete real-dataset adapter (e.g. SWE-bench) is a deferred registration.
+  Because M5 uses the single fixture, all episodes carry the fixture `task_id`; per-task identity and
+  seeding still differ via the corpus identity.
+- **CI stays hermetic.** The batch tests inject a mocked proposer and a stub verifier — no model, no
+  network, no `CAP_SYS_ADMIN` path — so `pytest -q` reports zero M5-attributable skips. The bounded
+  **live** sweep (real proposer + verifier) is the documented local acceptance step (D16.2).
+- **Freeze certification.** M5-C1..C7 implemented, Docker-verified, committed and pushed; all four gates
+  (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero M5-attributable
+  skips. Milestone tagged `m5-complete`. Future principles D24/D25 recorded, not implemented (D23).
