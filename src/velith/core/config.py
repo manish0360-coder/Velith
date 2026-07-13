@@ -104,6 +104,18 @@ class Settings(BaseSettings):
     batch_max_attempts_per_task: int = 1
     batch_max_tokens: int = 0
 
+    # --- M6 settings (shared retrieval substrate; M6_SPEC §5) ---
+    # Number of neighbours the retriever returns (a deterministic bound); consumed by
+    # the retriever (M6-C5).
+    retrieval_top_k: int = 5
+    # The single fixed, deterministic, domain-neutral embedding component used by the
+    # shared substrate (no routing; one component); consumed by the embedding seam (M6-C3).
+    retrieval_embedder: str = "hashed-ngram"
+    # The read-only episode memory the retriever reads (M6_SPEC §3.1), defaulting to the
+    # frozen M3 episode log. Read-only — M6 never writes here; consumed by the memory
+    # source (M6-C4).
+    retrieval_memory_path: Path = Path("data/episodes/episodes.jsonl")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
