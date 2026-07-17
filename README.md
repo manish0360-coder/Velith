@@ -431,3 +431,55 @@ documented local acceptance step, exactly as in M1.
 - `VELITH_BATCH_MAX_TASKS`, `VELITH_BATCH_MAX_ATTEMPTS_PER_TASK`, `VELITH_BATCH_MAX_TOKENS` —
   the cost-guard limits (`0` means unbounded). Per-step timeouts reuse the existing
   `VELITH_OLLAMA_TIMEOUT_SECONDS` / `VELITH_VERIFIER_TIMEOUT_SECONDS`.
+
+## M6 — the shared retrieval substrate
+
+M6 adds a **read-only, deterministic retrieval substrate** over the accumulated episode
+memory: given a query, it returns the top-k most relevant prior episodes. It is the single
+shared read path that later memory-bearing arms will use, so those arms can differ only in
+their write-filter while sharing an identical retriever, embedder, and top-k. M6 writes
+nothing, filters nothing, learns nothing, and does not change the cold arm A0.
+
+### Query derivation
+
+A query is derived from a task's required opaque **material** and an **optional** opaque
+**retrieval context** (`derive_query(material, context=None)`). With no context, the query
+is the material alone — identical to the baseline path; with context, material and context
+are joined by a fixed opaque delimiter. Both are treated as opaque, domain-neutral bytes
+and are never parsed as any domain; M6 admits the optional context but neither generates
+nor consumes it (it is a hook for later milestones, which may supply prior verdict state
+and/or metrics).
+
+### Deterministic embedding
+
+A single shared, **deterministic, domain-neutral** embedder (`Embedder`; reference
+`HashedNgramEmbedder`) maps opaque text to a fixed-length integer vector via
+content-addressed hashing (`hashlib`, not the randomized builtin `hash`) and scores
+similarity by integer dot product. The same opaque input always yields the same
+representation — no run-to-run or cross-process drift. There is exactly one component (no
+routing); `get_embedder` binds the configured identity to it and rejects any other name. A
+higher-fidelity embedder is a registration behind the interface and is not built in M6.
+
+### Read-only memory source
+
+`EpisodeMemory` projects the frozen episode store into an immutable `MemorySnapshot` via the
+store's verified read surface. It only reads — it never writes, re-orders, or mutates the
+store, the index, or any episode, and it exposes no write path. Because held-out experience
+was never persisted (the M4/M5 guarded boundary), the memory is held-out-free by
+construction.
+
+### Deterministic top-k retriever
+
+`Retriever` embeds the query and each episode's opaque representation with the shared
+embedder and returns the top-k by descending similarity, breaking ties on `content_hash`
+for a total, content-addressed order. Retrieval is a pure function of
+`(query, memory snapshot, top-k)` — identical inputs yield the identical ordered result —
+and is read-only.
+
+### Relevant settings
+
+- `VELITH_RETRIEVAL_TOP_K` — neighbours the retriever returns (default `5`).
+- `VELITH_RETRIEVAL_EMBEDDER` — the single fixed deterministic embedder (default
+  `hashed-ngram`; no routing).
+- `VELITH_RETRIEVAL_MEMORY_PATH` — the read-only episode memory the retriever reads
+  (default `data/episodes/episodes.jsonl`, the M3 episode log).
