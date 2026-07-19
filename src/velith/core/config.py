@@ -15,7 +15,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from velith.arms.identity import M7_ARMS, Arm
 
 Environment = Literal["development", "ci", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -115,6 +118,30 @@ class Settings(BaseSettings):
     # frozen M3 episode log. Read-only — M6 never writes here; consumed by the memory
     # source (M6-C4).
     retrieval_memory_path: Path = Path("data/episodes/episodes.jsonl")
+
+    # --- M7 settings (write-filter policies; M7_SPEC §5) ---
+    # The arm a run operates under and therefore, by the fixed binding (M7-C3), its
+    # write-filter. Validated against the *closed* M7 arm set: the frozen memoryless
+    # baseline A0 is not an M7 arm and is rejected here rather than failing later at
+    # binding. Defaults to the unfiltered control A1 — the conservative choice, since
+    # defaulting to the treatment A2 would make the manipulated variable implicit.
+    #
+    # NOTE (M7_SPEC §5, forbidden): there is deliberately **no** per-arm retrieval
+    # setting. Top-k, the embedder identity, and the memory source above remain the
+    # single shared M6 configuration for every arm; an arm-scoped retrieval knob would
+    # void D7.
+    active_arm: Arm = Arm.A1
+
+    @field_validator("active_arm")
+    @classmethod
+    def _active_arm_is_an_m7_arm(cls, value: Arm) -> Arm:
+        """Reject any arm outside the closed M7 set, loudly and at construction."""
+        if value not in M7_ARMS:
+            raise ValueError(
+                f"{value.value!r} is not an M7 arm; "
+                f"expected one of {[member.value for member in M7_ARMS]}"
+            )
+        return value
 
 
 @lru_cache(maxsize=1)

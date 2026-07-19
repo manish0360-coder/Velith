@@ -13,7 +13,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
+from velith.arms.identity import Arm
 from velith.core.config import Settings, get_settings
 
 
@@ -123,3 +125,46 @@ def test_retrieval_settings_are_overridable_via_env(monkeypatch: pytest.MonkeyPa
     assert settings.retrieval_top_k == 10
     assert settings.retrieval_embedder == "other-embedder"
     assert settings.retrieval_memory_path == Path("data/other/episodes.jsonl")
+
+
+def test_active_arm_defaults_to_the_control_arm() -> None:
+    """The M7 active arm defaults to the unfiltered control A1 (M7_SPEC §5)."""
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+    assert settings.active_arm is Arm.A1
+
+
+def test_active_arm_is_overridable_via_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``VELITH_ACTIVE_ARM`` selects any arm in the closed M7 set."""
+    monkeypatch.setenv("VELITH_ACTIVE_ARM", "A2")
+    get_settings.cache_clear()
+    try:
+        settings = Settings()
+    finally:
+        get_settings.cache_clear()
+    assert settings.active_arm is Arm.A2
+
+
+@pytest.mark.parametrize("value", ["A0", "A3", "A4", "baseline", ""])
+def test_active_arm_rejects_anything_outside_the_closed_set(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """A0 and unknown arms fail loudly at construction, not later at binding."""
+    monkeypatch.setenv("VELITH_ACTIVE_ARM", value)
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(ValidationError):
+            Settings()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_no_per_arm_retrieval_setting_exists() -> None:
+    """Retrieval configuration is shared by every arm; an arm-scoped knob voids D7."""
+    for name in Settings.model_fields:
+        if name.startswith("retrieval_"):
+            assert "arm" not in name and "a1" not in name and "a2" not in name
+        assert not name.startswith(("arm_retrieval", "a1_", "a2_"))
