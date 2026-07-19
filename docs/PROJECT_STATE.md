@@ -4,7 +4,7 @@
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
 **Last updated:** 2026-07-06
-**Current tag:** `m5-complete`
+**Current tag:** `m6-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -65,6 +65,17 @@ bounded by a hard **cost guard**; and a **run-provenance** record captures the e
 corpus manifest hash, arm, base model, batch seed, and the cost-guard budget/limits. Domain specifics
 live behind a neutral task-materialization adapter. This was *composition, not a rewrite* — no M0–M4
 contract was modified.
+
+**M6 — complete and certified** (`m6-complete`). A **read-only, deterministic retrieval substrate** now
+sits over the accumulated episode memory: given a query it returns the **top-k** most relevant prior
+episodes, ranked by a single shared deterministic embedder and broken on `content_hash` for a total,
+content-addressed order. A query derives from a task's required opaque **material** plus an **optional
+opaque retrieval context** that M6 admits but neither generates nor consumes. The memory source projects
+the frozen M3 store **read-only** — it writes nothing, re-orders nothing, mutates nothing — and is
+held-out-free by the M4/M5 guarded-boundary guarantee. There is exactly **one** retriever/embedder/top-k
+(D7), it is wired into no arm, and **A0 remains memoryless and unchanged**. Retrieval determinism was
+established by a discharged Prototype Gate (identical ordered top-k across processes, `PYTHONHASHSEED`
+values, and memory orderings). This was *composition, not a rewrite* — no M0–M5 contract was modified.
 
 ## 2. M1 objectives and achievements
 
@@ -334,15 +345,64 @@ non-software corpus sweeps through the identical path (6); no frozen M0–M4 fil
 runner tests injecting a mocked proposer and stub verifier so there are zero M5-attributable skips and
 the bounded live sweep is the documented local acceptance step (8, D16.2).
 
-## 9. Readiness for M6
+## 9. M6 objectives, achievements, and verification
 
-M6 is the **shared retrieval substrate** (D6/D7/D12): the memory the verified/unfiltered write-filter
-arms (M7) will read, holding the retriever/embedder/top-k identical across A1 and A2 so grounding is the
-only manipulated variable (D7). The batch runner, cold baseline A0, deterministic seeding, cost guard,
-and run provenance are now the durable substrate M6+ builds on; A0 remains the memoryless baseline the
-compounding experiment measures against. The JSONL log stays authoritative, the index a rebuildable
-projection, the held-out partition mechanically enforced, and every experience write passes the single
-guarded boundary. No M5 work blocks M6.
+Every M6 engineering goal (M6_SPEC §2/§6, handoff §9) was met, confined to a new domain-neutral
+`retrieval` layer composed read-only onto the frozen substrate:
 
-**Repository is M6-ready.** Begin M6 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1–M5.
+- **Query derivation** (M6_SPEC §3.2) — `retrieval/query.py` derives a deterministic, domain-neutral
+  query from a task's required opaque **material** plus an **optional opaque retrieval context**. With no
+  context the representation is the material alone (identical to the baseline path); both are opaque and
+  never parsed as any domain. M6 admits the context but neither generates nor consumes it.
+- **Deterministic embedding/similarity** (M6_SPEC §3.3) — `retrieval/embedding.py` provides the single
+  shared `Embedder` interface and its reference `HashedNgramEmbedder`: content-addressed hashing
+  (`hashlib`, never the randomized builtin `hash`) into a fixed-length integer vector, scored by integer
+  dot product. No sampling, no run-to-run or cross-process drift; `get_embedder` binds exactly one
+  component and rejects any other identity (no routing).
+- **Read-only memory source** (M6_SPEC §3.1) — `retrieval/memory.py` projects the frozen M3 store into
+  an immutable `MemorySnapshot` via the store's verified read surface. It exposes no write path and
+  never writes, re-orders, or mutates the store, the index, or any episode; the memory is held-out-free
+  by the M4/M5 write guarantee (D8).
+- **Deterministic top-k retriever** (M6_SPEC §3.4/§3.5) — `retrieval/retriever.py` ranks by descending
+  similarity with **content-addressed tie-breaking on `content_hash`**, returning the top-k. Retrieval is
+  a pure function of `(query, memory snapshot, top-k)` and is read-only. Exactly one shared
+  retriever/embedder/top-k exists — no per-arm variation (D7).
+- **A0 untouched, composition only** — retrieval is wired into no arm; the `batch` layer, episode schema,
+  store, index, corpus layer, task type, verifier, and LLM client are unmodified. The only M0–M5 change
+  is additive `core/config.py` settings. Future principles D24/D25 are recorded but not implemented (D23).
+- **Prototype Gate discharged** (M6_SPEC §7) — the required feasibility prototype established
+  deterministic embedding/retrieval: byte-identical ordered top-k under `PYTHONHASHSEED` 0, 1 and
+  `random`, and invariant to memory presentation order (reversed, rotated, sorted, reverse-sorted).
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `5d7e848` | feat: retrieval settings (M6-C1) |
+| `5606ee5` | feat: deterministic query derivation (M6-C2) |
+| `9662674` | feat: deterministic embedding interface (M6-C3) |
+| `e80025d` | feat: read-only retrieval memory source (M6-C4) |
+| `ab56648` | feat: deterministic retriever (M6-C5) |
+| `9496982` | test: verify deterministic retrieval (M6-C6) |
+| `8809221` | docs: document shared retrieval substrate (M6-C7) |
+
+**Definition of Done — all satisfied (M6_SPEC §6, handoff §9).** The read-only substrate returns top-k
+for a query (material + optional opaque context) composing the frozen store and mutating nothing (1);
+retrieval is deterministic with content-addressed tie-breaking (2); the embedder is a single shared,
+deterministic, domain-neutral component with no drift (3); exactly one retriever/embedder/top-k exists
+(4); A0 is unchanged and no frozen M0–M5 file is modified, the only addition being the read-only
+retrieval layer and additive settings (5); a non-software memory retrieves through the identical path
+(6); the memory holds no held-out episode and is served read-only from a snapshot (7); all four gates are
+green in the container and CI with zero M6-attributable skips (8).
+
+## 10. Readiness for M7
+
+M7 is the **write-filter policies A1/A2** (D6/D7/D12): the unfiltered and verification-filtered memory
+arms, which must differ **only** in their write-filter while sharing the identical retriever, embedder
+and top-k that M6 now provides. The retrieval substrate is read-only and single-shared by construction,
+so grounding remains the sole manipulated variable (D7). The JSONL log stays authoritative, the index a
+rebuildable projection, the held-out partition mechanically enforced, every experience write passes the
+single guarded boundary, and A0 remains the memoryless baseline. No M6 work blocks M7.
+
+**Repository is M7-ready.** Begin M7 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1–M6.

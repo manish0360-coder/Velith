@@ -102,3 +102,29 @@ M5-C1..C7). Record for future contributors:
 - **Freeze certification.** M5-C1..C7 implemented, Docker-verified, committed and pushed; all four gates
   (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero M5-attributable
   skips. Milestone tagged `m5-complete`. Future principles D24/D25 recorded, not implemented (D23).
+
+## M6 — shared retrieval substrate (freeze)
+
+M6 adds a read-only retrieval layer without touching any M0–M5 contract (M6_SPEC frozen; handoff
+M6-C1..C7). Record for future contributors:
+
+- **Read-only is the load-bearing invariant.** `EpisodeMemory` projects the frozen store through its
+  verified read surface into an immutable `MemorySnapshot`; the retriever ranks in memory. Nothing in
+  `velith/retrieval` writes, re-orders, or mutates the store, the index, or any episode, and the package
+  references `velith.batch` nowhere — A0 stays memoryless and untouched.
+- **Determinism is structural, not incidental.** The embedder uses `hashlib` (never the randomized
+  builtin `hash`) and integer arithmetic only, and ranking breaks ties on `content_hash`. Retrieval is a
+  pure function of `(query, snapshot, top-k)`. The Prototype Gate proved this before M6-C1: byte-identical
+  ordered top-k under `PYTHONHASHSEED` 0/1/`random` and invariant to memory presentation order. **Any
+  future embedder must satisfy the same contract** — a randomized or float-drifting embedder would void
+  D7's "identical retriever across arms" and D8/D16.1 reproducibility.
+- **One component, no routing.** `get_embedder` binds exactly one embedder and raises on any other
+  identity. There is a single retriever/embedder/top-k so that M7's arms can differ *only* by
+  write-filter (D7).
+- **The optional retrieval context is an admitted hook, not a feature.** A query is material (required)
+  plus an optional opaque context; M6 neither generates nor consumes it and produces no metrics (D22).
+  It exists so M7–M10 are not artificially constrained.
+- **Freeze certification.** M6-C1..C7 implemented, Docker-verified, committed and pushed; all four gates
+  (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero M6-attributable
+  skips (the reference embedding is in-process — no model, no network). Milestone tagged `m6-complete`.
+  Future principles D24/D25 recorded, not implemented (D23).
