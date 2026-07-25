@@ -4,7 +4,7 @@
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
 **Last updated:** 2026-07-06
-**Current tag:** `m6-complete`
+**Current tag:** `m7-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -76,6 +76,22 @@ held-out-free by the M4/M5 guarded-boundary guarantee. There is exactly **one** 
 (D7), it is wired into no arm, and **A0 remains memoryless and unchanged**. Retrieval determinism was
 established by a discharged Prototype Gate (identical ordered top-k across processes, `PYTHONHASHSEED`
 values, and memory orderings). This was *composition, not a rewrite* — no M0–M5 contract was modified.
+
+**M7 — complete and certified** (`m7-complete`). The experiment's **single manipulated variable** now
+exists: the **write-filter**, the policy deciding which grounded experience an arm retains in memory.
+Two arms are defined — **A1 (unfiltered)**, the RAG/null control that retains every episode, and **A2
+(verified)**, which retains only trustworthy grounded signal: a *verified success* (`PASSED`
+uncontradicted by the held-out secondary — the model-gap `PASSED` is excluded, D21) and a *verified
+failure* (`FAILED`), excluding the unverified outcomes (`PATCH_APPLY_FAILED`, `NO_PATCH`, `INFRA_ERROR`)
+and every `flaky` measurement (D17). Admission is decided solely by the neutral triple
+(`verdict_state`, `secondary_passed`, `flaky`), never by reading task content (D9/D22). Each arm binds
+to exactly one filter by a **total, injective, run-immutable** mapping (A0 has no policy and fails
+loudly); an **arm memory view** applies the fixed order **Episode Store → Arm Filter → Memory Snapshot →
+Shared Retriever**, writing nothing and producing an identical snapshot for identical episodes + arm,
+independent of persistence order. A1 and A2 retrieve through the **identical** M6 retriever/embedder/top-k
+— the write-filter is the only difference (D7), guarded by a permanent check that fails loudly on
+divergence. **A0 remains memoryless and unchanged.** This was *composition, not a rewrite* — no M0–M6
+contract was modified.
 
 ## 2. M1 objectives and achievements
 
@@ -395,14 +411,75 @@ retrieval layer and additive settings (5); a non-software memory retrieves throu
 (6); the memory holds no held-out episode and is served read-only from a snapshot (7); all four gates are
 green in the container and CI with zero M6-attributable skips (8).
 
-## 10. Readiness for M7
+## 10. M7 objectives, achievements, and verification
 
-M7 is the **write-filter policies A1/A2** (D6/D7/D12): the unfiltered and verification-filtered memory
-arms, which must differ **only** in their write-filter while sharing the identical retriever, embedder
-and top-k that M6 now provides. The retrieval substrate is read-only and single-shared by construction,
-so grounding remains the sole manipulated variable (D7). The JSONL log stays authoritative, the index a
-rebuildable projection, the held-out partition mechanically enforced, every experience write passes the
-single guarded boundary, and A0 remains the memoryless baseline. No M6 work blocks M7.
+Every M7 engineering goal (M7_SPEC §2/§6, handoff §9) was met, confined to a new domain-neutral `arms`
+layer composed onto the frozen substrate:
 
-**Repository is M7-ready.** Begin M7 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1–M6.
+- **Arm identity** (M7_SPEC §3.1) — `arms/identity.py` names the closed M7 arm set (A1, A2) alongside the
+  frozen A0, recorded through the frozen `arm` provenance field. A0 is present but is not an M7 arm; A3/A4
+  are absent. Identity only — no filter, binding, or memory logic, and no `velith` import.
+- **Write-filter policies** (M7_SPEC §3.2) — `arms/filters.py` provides the two deterministic,
+  domain-neutral admission predicates. **A1** admits every episode; **A2** admits exactly a verified
+  success (`PASSED` with `secondary_passed` `True` or absent) and a verified failure (`FAILED`), excluding
+  the model-gap `PASSED` (D21), `PATCH_APPLY_FAILED`, `NO_PATCH`, `INFRA_ERROR`, and every `flaky` episode
+  (D17). Admission reads only the neutral triple (`verdict_state`, `secondary_passed`, `flaky`).
+- **Run-immutable arm→filter binding** (M7_SPEC §3.1) — `arms/binding.py` binds each arm to exactly one
+  filter by a total, injective mapping (a read-only table; a frozen `ArmBinding`), resolved once and
+  immutable for the run's lifetime. A0 has no retention policy and raises `BindingError`, so no run can
+  carry an undeclared, ambiguous, or shifting policy.
+- **Arm memory view** (M7_SPEC §3.3) — `arms/memory_view.py` applies the fixed projection order
+  **Episode Store → Arm Filter → Memory Snapshot**, read-only, producing an immutable, content-addressed
+  snapshot. It writes nothing, deletes/mutates/re-orders no grounding record, and yields an identical
+  snapshot for identical episodes + arm, independent of persistence order (D8/D16.1/D18); held-out-free by
+  the inherited M4/M5 guarantee. The snapshot is handed to the **unchanged** M6 retriever (stage 4).
+- **Shared-retrieval invariant** (M7_SPEC §3.4, D7) — a permanent check
+  (`test_arms_shared_retrieval_invariant.py`) proves, structurally and by signature and configuration,
+  that A1 and A2 use the identical retriever/embedder/top-k with the write-filter as the only difference,
+  and fails loudly on divergence. There is no per-arm retrieval setting.
+- **A0 untouched, composition only** — the `batch`/A0 runner, `retrieval` substrate, episode schema,
+  store, index, corpus layer, task type, verifier, and LLM client are unmodified. The only M0–M6 change is
+  the additive `active_arm` `core/config.py` setting. Future principles D24/D25 are recorded but not
+  implemented (D23).
+- **Prototype Gate** (M7_SPEC §7) — assessed **not required**: M7 adds no unproven environmental
+  mechanism, only deterministic predicate logic over existing neutral fields and a read-only projection
+  over the already-proven M6 substrate.
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `99a0dd7` | feat(m7): introduce arm identity layer (M7-C1) |
+| `663f719` | feat(m7): implement write filter policies (M7-C2) |
+| `828b024` | feat(m7): add immutable arm filter binding (M7-C3) |
+| `6e356e8` | feat(m7): add active arm configuration (M7-C4) |
+| `660a4e3` | feat(m7): implement deterministic arm memory view (M7-C5) |
+| `9bc8b3b` | test(m7): enforce shared retrieval invariant (M7-C6) |
+| `b364f61` | test(m7): add end-to-end write filter acceptance (M7-C7) |
+
+**Definition of Done — all satisfied (M7_SPEC §6, handoff §9).** Two deterministic, domain-neutral
+write-filters exist (1); A1 admits every episode (2); A2 admits exactly verified successes and failures
+and excludes the model-gap `PASSED`, the unverified outcomes, and every `flaky` episode (3); each arm
+binds to one filter by a total, injective, run-immutable mapping surfaced through the frozen `arm`
+provenance (4); the arm memory view applies the fixed projection order, writing nothing and re-ordering
+nothing (5); identical episodes + identical arm yield an identical snapshot independent of persistence
+order (6); A1 and A2 retrieve through the identical shared substrate, permanently checked (7); no arm's
+memory holds a held-out episode and A0 is memoryless and unchanged (8); domain-neutrality and determinism
+hold, no frozen M0–M6 file is modified beyond the additive setting, and all four gates are green in the
+container and CI with zero M7-attributable skips (9). **Verification evidence:** `docker compose run --rm
+verifier` — `ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q` all green across
+M7-C1..C8; M7 adds no network-isolation-gated test and no live model/network path, so `pytest -q` reports
+zero M7-attributable skips (handoff §7).
+
+## 11. Readiness for M8
+
+M8 is **frozen checkpointed held-out evaluation** (D8/D12): evaluating the arms produced here against the
+held-out partition at frozen checkpoints, without ever admitting held-out experience into memory. M7
+delivers exactly what M8 measures — A1 and A2 as read-only, deterministic, shared-substrate memories over
+the accumulated experience — while leaving arm *execution*, evaluation, comparison, and any statistic
+deferred (M7_SPEC §8). The held-out partition stays mechanically enforced, every experience write passes
+the single guarded boundary, the JSONL log stays authoritative, and A0 remains the memoryless baseline.
+No M7 work blocks M8.
+
+**Repository is M8-ready.** Begin M8 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1–M7.

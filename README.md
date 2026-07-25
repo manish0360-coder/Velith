@@ -483,3 +483,76 @@ and is read-only.
   `hashed-ngram`; no routing).
 - `VELITH_RETRIEVAL_MEMORY_PATH` — the read-only episode memory the retriever reads
   (default `data/episodes/episodes.jsonl`, the M3 episode log).
+
+## M7 — write-filter policies (A1/A2)
+
+M7 adds the experiment's **single manipulated variable**: the *write-filter*, the policy
+deciding which grounded experience an arm **retains in memory**. It composes onto the frozen
+M6 substrate and changes nothing else — no store, no verdict, no retriever. It defines *what
+each arm's memory is*; it does not execute the arms or condition proposals on retrieved
+memory (that composes these pieces later). Filtering is domain-neutral: admission is decided
+only from an episode's neutral, already-grounded outcome provenance, never by reading task
+content.
+
+### The arms
+
+- **A1 — unfiltered memory:** admits **every** episode of its arm regardless of outcome — the
+  RAG/null control, isolating what plain retrieval of experience contributes.
+- **A2 — verified memory:** admits only trustworthy grounded verification signal (below).
+
+`A0` remains the frozen cold, memoryless baseline; it is not an M7 arm. The M7 arm set is
+closed to A1 and A2 (the anti-grounding and ablation arms are out of scope). Each arm is
+recorded on the episode through the frozen `arm` provenance field.
+
+### The A2 admission boundary
+
+A2 admits **exactly** two categories, decided solely by the triple
+(`verdict_state`, `secondary_passed`, `flaky`):
+
+- a **verified success** — `verdict_state == PASSED` **and** the held-out secondary does not
+  contradict it (`secondary_passed` is `True` or absent). A `PASSED` refuted by the held-out
+  suite (`secondary_passed == False`) is the *model gap* and is **excluded** — retaining it
+  would seed memory with a gamed solution.
+- a **verified failure** — `verdict_state == FAILED`: a candidate was produced, applied, and
+  disposed of by the verifier. A real measurement of reality, first-class learning data.
+
+Everything else is **excluded**: `PATCH_APPLY_FAILED` and `NO_PATCH` (no verification
+occurred), `INFRA_ERROR` (a loop failure, not a grounded outcome), and **any** episode
+flagged `flaky` in any category (an untrustworthy measurement is not verified signal).
+
+### The arm → filter binding
+
+Each arm is bound to exactly one write-filter by a **total, injective** mapping that is
+**fixed when the run's identity is fixed and immutable for the run's lifetime** — never
+re-bound or selected dynamically per task, attempt, query, or observed outcome. A run
+therefore has exactly one retention policy throughout. `A0` has no policy; asking for one
+fails loudly, so no run can carry an undeclared or shifting retention policy.
+
+### The arm memory view
+
+`ArmMemoryView` applies a **fixed, total projection order**:
+
+```
+Episode Store  →  Arm Filter  →  Memory Snapshot  →  Shared Retriever
+```
+
+The frozen store is read (scoped to the arm) as the only source of experience; the arm's
+filter is the only stage deciding admission; the admitted episodes are fixed as an immutable,
+content-addressed snapshot. The view **writes nothing** — it never mutates, re-orders,
+appends to, or deletes from the store — so every grounded record stays in the authoritative
+log exactly as written. Identical persisted episodes plus an identical arm always produce an
+**identical** snapshot, independent of interpreter hash seeding and of the order in which
+experience was persisted. The snapshot is then handed to the **unchanged** M6 retriever.
+
+### The shared-retrieval invariant (D7)
+
+A1 and A2 retrieve through the **identical** retriever, embedder, and top-k — the write-filter
+is the *only* difference. Retrieval is never parameterised by arm, and there is deliberately
+**no per-arm retrieval setting**. If the arms' retrievers ever differed, the experiment would
+be void, not merely degraded; a permanent check enforces this and fails loudly on divergence.
+
+### Relevant settings
+
+- `VELITH_ACTIVE_ARM` — the arm a run operates under, and therefore (by the fixed binding) its
+  write-filter. One of `A1` | `A2` (default `A1`, the control). `A0` and any unknown arm are
+  rejected at startup.

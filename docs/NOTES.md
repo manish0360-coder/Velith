@@ -128,3 +128,43 @@ M6-C1..C7). Record for future contributors:
   (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero M6-attributable
   skips (the reference embedding is in-process — no model, no network). Milestone tagged `m6-complete`.
   Future principles D24/D25 recorded, not implemented (D23).
+
+## M7 — write-filter policies (A1/A2) (freeze)
+
+M7 adds the experiment's single manipulated variable — the write-filter — as a domain-neutral `arms`
+layer composed onto the frozen M6 substrate (M7_SPEC frozen; handoff M7-C1..C8). Record for future
+contributors:
+
+- **The write-filter is the only difference between arms.** A1 (unfiltered) and A2 (verified) retrieve
+  through the **identical** M6 retriever/embedder/top-k; if their retrievers ever differed the experiment
+  is *void*, not degraded (D7). The invariant is structural — `arms/**` never imports the
+  retriever/embedder, only the read-only memory seam — and is enforced by a permanent check
+  (`test_arms_shared_retrieval_invariant.py`) that fails loudly on divergence. **There is deliberately no
+  per-arm retrieval setting**; adding one would void D7.
+- **A2's admission boundary is exact and neutral.** Admit only a *verified success* (`PASSED` **and**
+  `secondary_passed` not `False` — the model-gap `PASSED` is excluded, D21) or a *verified failure*
+  (`FAILED`). Exclude `PATCH_APPLY_FAILED`/`NO_PATCH`/`INFRA_ERROR` (no verification occurred) and **every**
+  `flaky` episode (D17), including an otherwise-qualifying `PASSED`/`FAILED`. Admission consults only the
+  triple (`verdict_state`, `secondary_passed`, `flaky`), never task content (D9/D22) — so a non-software
+  memory filters identically. Any change to this boundary is a spec change, not a code change.
+- **Filtering is admission into memory, never deletion.** The arm memory view is read-only: it writes
+  nothing and mutates, appends to, deletes from, and re-orders nothing. Every grounded record stays in the
+  authoritative log exactly as the frozen store wrote it (D2/D3/D16.7); the log is asserted byte-unchanged
+  after projection. The snapshot is placed in **content-addressed** order (not log order) so identical
+  episodes + identical arm always yield an identical snapshot, independent of persistence order and hash
+  seeding (D8/D16.1/D18) — the property M8's evaluation will depend on.
+- **The arm→filter binding is fixed for the run.** A total, injective, run-immutable mapping: resolved
+  once when the run's identity is fixed, never re-bound or selected dynamically. A0 is the frozen
+  memoryless baseline — not an M7 arm — and has no policy; asking for one raises `BindingError`, and the
+  `active_arm` setting rejects A0 (and any unknown arm) at startup. No run can carry an undeclared or
+  shifting retention policy.
+- **A0 is untouched.** M7 defines *what each arm's memory is*; it does not execute the arms or condition
+  proposals on retrieved memory (deferred, M7_SPEC §8). The `batch`/A0 runner and all frozen M0–M6
+  contracts are unmodified; the only change is the additive `active_arm` config.
+- **Prototype Gate — assessed not required.** M7 asserts no unproven environmental mechanism (pure
+  in-process predicate logic + a read-only projection over the already-proven M6 substrate), so no
+  feasibility prototype was armed (M7_SPEC §7).
+- **Freeze certification.** M7-C1..C8 implemented, Docker-verified, committed and pushed; all four gates
+  (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero M7-attributable
+  skips (no model, no network). Milestone tagged `m7-complete`. Future principles D24/D25 recorded, not
+  implemented (D23).
