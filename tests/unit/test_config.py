@@ -168,3 +168,54 @@ def test_no_per_arm_retrieval_setting_exists() -> None:
         if name.startswith("retrieval_"):
             assert "arm" not in name and "a1" not in name and "a2" not in name
         assert not name.startswith(("arm_retrieval", "a1_", "a2_"))
+
+
+def test_eval_settings_defaults() -> None:
+    """The M8 evaluation settings carry safe defaults (M8_SPEC §5)."""
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+    assert settings.eval_seed == 0
+    assert settings.eval_sink_path == Path("data/evaluation/heldout.jsonl")
+    assert settings.eval_max_tasks == 0
+    assert settings.eval_max_attempts_per_task == 1
+    assert settings.eval_max_tokens == 0
+
+
+def test_eval_settings_are_overridable_via_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each M8 evaluation setting is overridable via its ``VELITH_*`` variable."""
+    monkeypatch.setenv("VELITH_EVAL_SEED", "11")
+    monkeypatch.setenv("VELITH_EVAL_SINK_PATH", "data/other/heldout.jsonl")
+    monkeypatch.setenv("VELITH_EVAL_MAX_TASKS", "50")
+    monkeypatch.setenv("VELITH_EVAL_MAX_ATTEMPTS_PER_TASK", "2")
+    monkeypatch.setenv("VELITH_EVAL_MAX_TOKENS", "40000")
+    get_settings.cache_clear()
+    try:
+        settings = Settings()
+    finally:
+        get_settings.cache_clear()
+    assert settings.eval_seed == 11
+    assert settings.eval_sink_path == Path("data/other/heldout.jsonl")
+    assert settings.eval_max_tasks == 50
+    assert settings.eval_max_attempts_per_task == 2
+    assert settings.eval_max_tokens == 40000
+
+
+def test_eval_sink_is_distinct_from_the_experience_log() -> None:
+    """The evaluation sink must never coincide with the experience log (M8_SPEC §3.4)."""
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+    assert settings.eval_sink_path != settings.episode_path
+    assert settings.eval_sink_path != settings.retrieval_memory_path
+
+
+def test_no_statistic_or_decision_setting_exists() -> None:
+    """M8 measures; it does not conclude - no statistic/threshold/decision knob (M8_SPEC §5)."""
+    forbidden = ("statistic", "threshold", "decision", "pvalue", "p_value", "effect", "go_no_go")
+    for name in Settings.model_fields:
+        assert not any(token in name for token in forbidden)

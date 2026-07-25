@@ -143,6 +143,24 @@ class Settings(BaseSettings):
             )
         return value
 
+    # --- M8 settings (frozen checkpointed held-out evaluation; M8_SPEC §5) ---
+    # The fixed seed from which each held-out task's per-attempt seed is deterministically
+    # derived; recorded in the evaluation provenance as part of its identity (M8-C7).
+    eval_seed: int = 0
+    # Where the segregated held-out evaluation records are written. Distinct from the
+    # experience log (`episode_path`) and never a memory source — a held-out outcome can
+    # never become experience (M8_SPEC §3.4). Under the gitignored `data/` tree.
+    eval_sink_path: Path = Path("data/evaluation/heldout.jsonl")
+    # Evaluation cost-guard limits (M8_SPEC §5) — deterministic bounds on the held-out
+    # sweep, reusing the frozen M5 cost-guard discipline; `0` means "unbounded". Consumed
+    # by the runner (M8-C8).
+    eval_max_tasks: int = 0
+    eval_max_attempts_per_task: int = 1
+    eval_max_tokens: int = 0
+
+    # NOTE (M8_SPEC §5, forbidden): no per-arm retrieval setting, and no statistic,
+    # threshold, or decision parameter (that is M9/M10). M8 measures; it does not conclude.
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
