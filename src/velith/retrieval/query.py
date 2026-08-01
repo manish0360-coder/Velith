@@ -46,6 +46,6 @@ def derive_query(material: str, context: str | None = None) -> Query:
 
     The single derivation entry point (M6_SPEC §3.2): ``material`` is required;
     ``context`` is optional and opaque. M6 neither generates nor consumes the context —
-    it only admits it so later milestones (M7–M10) are not artificially constrained.
+    it only admits it so later milestones (M7-M10) are not artificially constrained.
     """
     return Query(material=material, context=context)
