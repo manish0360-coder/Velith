@@ -141,8 +141,9 @@ def test_binding_is_total_and_immutable_and_a0_has_no_policy() -> None:
     for arm in M7_ARMS:
         binding = resolve_binding(arm)
         assert binding.arm is arm
+        frozen_field = "write_filter"
         with pytest.raises(dataclasses.FrozenInstanceError):
-            setattr(binding, "write_filter", resolve_binding(arm).write_filter)
+            setattr(binding, frozen_field, resolve_binding(arm).write_filter)
     with pytest.raises(BindingError, match="A0"):
         resolve_binding(Arm.A0)
 

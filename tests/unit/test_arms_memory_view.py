@@ -150,8 +150,9 @@ def test_snapshot_is_immutable(tmp_path: Path) -> None:
     snapshot = _view(path, Arm.A1).snapshot()
 
     assert isinstance(snapshot.episodes, tuple)
+    frozen_field = "episodes"
     with pytest.raises(dataclasses.FrozenInstanceError):
-        setattr(snapshot, "episodes", ())
+        setattr(snapshot, frozen_field, ())
 
 
 def test_identical_episodes_and_arm_yield_an_identical_snapshot(tmp_path: Path) -> None:

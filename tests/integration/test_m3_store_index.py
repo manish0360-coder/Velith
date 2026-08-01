@@ -59,17 +59,32 @@ def _corpus() -> list[Episode]:
     """A small, varied corpus spanning several verdict states and neutral fields."""
     return [
         _episode(
-            task_id="task_a", seed=1, model="model_x", verdict_state=VerdictState.PASSED,
-            secondary_passed=True, flaky=False, timestamp="2026-07-06T01:00:00+00:00",
+            task_id="task_a",
+            seed=1,
+            model="model_x",
+            verdict_state=VerdictState.PASSED,
+            secondary_passed=True,
+            flaky=False,
+            timestamp="2026-07-06T01:00:00+00:00",
         ),
         _episode(
-            task_id="task_b", seed=2, model="model_y", verdict_state=VerdictState.FAILED,
-            secondary_passed=False, flaky=True, timestamp="2026-07-06T02:00:00+00:00",
+            task_id="task_b",
+            seed=2,
+            model="model_y",
+            verdict_state=VerdictState.FAILED,
+            secondary_passed=False,
+            flaky=True,
+            timestamp="2026-07-06T02:00:00+00:00",
             patch="--- a/b.py\n+++ b/b.py\n",
         ),
         _episode(
-            task_id="task_a", seed=3, model="model_x", verdict_state=VerdictState.NO_PATCH,
-            secondary_passed=None, flaky=False, timestamp="2026-07-06T03:00:00+00:00",
+            task_id="task_a",
+            seed=3,
+            model="model_x",
+            verdict_state=VerdictState.NO_PATCH,
+            secondary_passed=None,
+            flaky=False,
+            timestamp="2026-07-06T03:00:00+00:00",
             patch="",
         ),
     ]

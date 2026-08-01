@@ -69,14 +69,24 @@ def test_arm_layer_never_imports_the_retriever_or_embedder() -> None:
 
 
 def test_arm_layer_touches_only_the_read_only_memory_seam() -> None:
-    """The single permitted retrieval dependency is the read-only memory source."""
-    retrieval_imports = {
-        name
-        for module in _arm_layer_modules()
-        for name in _imported_modules(module)
-        if name.startswith("velith.retrieval")
-    }
-    assert retrieval_imports <= {"velith.retrieval.memory"}
+    """The single permitted retrieval dependency is the read-only memory source.
+
+    The arm layer may depend on the read-only memory seam ``velith.retrieval.memory`` and
+    the names it exports (``EpisodeMemory``, ``MemorySnapshot``) — those *are* the seam —
+    but on nothing else under ``velith.retrieval`` (notably not the retriever or embedder),
+    which would let an arm reshape the shared substrate and void D7 (§3.4). ``_imported_modules``
+    records both the module (``velith.retrieval.memory``) and each imported name qualified as
+    ``velith.retrieval.memory.EpisodeMemory``; the seam-prefix check admits the module and its
+    members while still rejecting ``velith.retrieval.retriever`` / ``velith.retrieval.embedding``.
+    """
+    seam = "velith.retrieval.memory"
+    for module in _arm_layer_modules():
+        for name in _imported_modules(module):
+            if not name.startswith("velith.retrieval"):
+                continue
+            assert name == seam or name.startswith(
+                seam + "."
+            ), f"{module.name} touches {name}, outside the read-only memory seam {seam!r}"
 
 
 def test_the_retriever_accepts_no_arm() -> None:
