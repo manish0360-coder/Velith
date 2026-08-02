@@ -168,3 +168,40 @@ contributors:
   (`ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`) green with zero M7-attributable
   skips (no model, no network). Milestone tagged `m7-complete`. Future principles D24/D25 recorded, not
   implemented (D23).
+
+## M8 — frozen checkpointed held-out evaluation (freeze)
+
+M8 adds the program's first measurement instrument as a domain-neutral `evaluation` layer composed onto
+the frozen M0–M7 substrate (M8_SPEC frozen; handoff M8-C1..C10). Record for future contributors:
+
+- **Held-out is measured but never learned.** Evaluation reads held-out tasks to attempt them, but a
+  held-out outcome is written **only** to the segregated evaluation sink — a plain JSONL distinct from the
+  experience log, not a memory source — and `evaluation/**` never imports or calls `GuardedEpisodeWriter`.
+  The held-out lock is therefore preserved by construction *and* independently enforced: the guarded
+  boundary still fail-closes on a held-out identity (D8). A held-out outcome can never become experience.
+- **The measure is the verifier's verdict, never a model's opinion.** The recorded outcome is the
+  deterministic verifier verdict on the held-out hidden test, with the held-out secondary / model-gap
+  signal (D21), plus **only** the already-frozen deterministic token counts. No model score, no
+  LLM-as-judge, no new metric (D3/D11/D22). Any change to this boundary is a spec change, not a code one.
+- **A checkpoint pins what an arm knows.** It is an order-independent, content-addressed, immutable capture
+  of the arm's M7 memory snapshot (A0's empty by construction); its identity excludes the arm, so an empty
+  checkpoint shares one identity across arms. This is what makes evaluation reproducible and comparable.
+- **The harness is identical across arms; only memory differs.** A0 attempts memorylessly; A1/A2 condition
+  the **unchanged** frozen proposer via caller-side context assembly in which only the retrieved-memory
+  portion may vary — so at an empty checkpoint the prompt is bit-for-bit identical across A0/A1/A2 (the
+  exact cold-start control). Retrieval uses the frozen M6 substrate stateless/no-cache; the per-task seed
+  reuses the frozen M5 `derive_task_seed`. This is the first milestone in which retrieval informs a
+  proposal, confined to read-only held-out evaluation.
+- **Every measurement is identity-bound; the sweep is cost-guarded.** The content-addressed
+  `EvaluationProvenance` (checkpoint identity, manifest hash, arm, base model, eval seed, cost-guard
+  limits) binds results to one checkpoint and split; the runner refuses a mismatched provenance loudly and
+  halts loudly at a `CostGuard` limit **without writing a partial record** (charge-before-write).
+- **M8 measures; it does not conclude.** No statistic, aggregate, or decision is computed — those are M9
+  (pre-registration freeze) and M10 (Stage-1 statistics / go-no-go). A permanent invariant test enforces
+  this and the held-out-safety guarantees, structurally and behaviourally, with a non-vacuity check.
+- **Prototype Gate — assessed not required.** M8 introduces no unproven environmental mechanism; it
+  composes already-proven parts in the same determinism envelope A0's live sweep uses (D18, M8_SPEC §7).
+- **Freeze certification.** M8-C1..C10 implemented, Docker-verified (rebuild the image before the gate —
+  the Dockerfile bakes sources), committed and pushed; all four gates green with zero M8-attributable
+  skips (no model, no network). Milestone tagged `m8-complete`. Future principles D24/D25 recorded, not
+  implemented (D23).

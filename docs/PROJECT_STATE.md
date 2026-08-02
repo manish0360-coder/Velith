@@ -4,7 +4,7 @@
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
 **Last updated:** 2026-07-06
-**Current tag:** `m7-complete`
+**Current tag:** `m8-complete`
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -92,6 +92,23 @@ independent of persistence order. A1 and A2 retrieve through the **identical** M
 — the write-filter is the only difference (D7), guarded by a permanent check that fails loudly on
 divergence. **A0 remains memoryless and unchanged.** This was *composition, not a rewrite* — no M0–M6
 contract was modified.
+
+**M8 — complete and certified** (`m8-complete`). The program reaches its first **measurement**: each arm
+(A0, A1, A2) is evaluated against the **held-out** partition at a **frozen checkpoint**, through one
+identical, deterministic harness, and the per-task outcome is recorded as a **segregated measurement**
+that can never become experience. A **checkpoint** captures an arm's memory as an order-independent,
+content-addressed, immutable snapshot (A0's empty by construction). The **memory-conditioned attempt** is
+the first place retrieval informs a proposal — A0 memoryless, A1/A2 conditioned read-only on their
+checkpoint memory via the frozen M6 retriever used stateless — and it drives the **unchanged** frozen
+`propose → verify` loop; conditioning is caller-side context assembly in which **only the retrieved
+memory may differ**, so at an empty checkpoint all three arms produce a **bit-for-bit identical** prompt.
+The recorded measurement is the **deterministic verifier verdict** (with the held-out secondary), never a
+model score (D3/D11), plus only the already-frozen deterministic token counts. Records land **only** in a
+segregated sink — never the experience log, never through `GuardedEpisodeWriter` — so the held-out lock is
+preserved (D8) and, independently, the guarded boundary still fail-closes. Each evaluation carries a
+content-addressed identity binding results to one checkpoint and split; the sweep is cost-guarded and
+halts loudly with no partial record. M8 **computes no statistic and reaches no decision** (D22; those are
+M9/M10). This was *composition, not a rewrite* — no M0–M7 contract was modified.
 
 ## 2. M1 objectives and achievements
 
@@ -471,15 +488,85 @@ verifier` — `ruff check`, `ruff format --check`, `mypy src tests`, `pytest -q`
 M7-C1..C8; M7 adds no network-isolation-gated test and no live model/network path, so `pytest -q` reports
 zero M7-attributable skips (handoff §7).
 
-## 11. Readiness for M8
+## 11. M8 objectives, achievements, and verification
 
-M8 is **frozen checkpointed held-out evaluation** (D8/D12): evaluating the arms produced here against the
-held-out partition at frozen checkpoints, without ever admitting held-out experience into memory. M7
-delivers exactly what M8 measures — A1 and A2 as read-only, deterministic, shared-substrate memories over
-the accumulated experience — while leaving arm *execution*, evaluation, comparison, and any statistic
-deferred (M7_SPEC §8). The held-out partition stays mechanically enforced, every experience write passes
-the single guarded boundary, the JSONL log stays authoritative, and A0 remains the memoryless baseline.
-No M7 work blocks M8.
+Every M8 engineering goal (M8_SPEC §2/§6, handoff §9) was met, confined to a new domain-neutral
+`evaluation` layer composed onto the frozen substrate:
 
-**Repository is M8-ready.** Begin M8 only against its own ratified engineering specification and
-implementation handoff, in the same atomic, gate-verified workflow used for M1–M7.
+- **Checkpoint** (M8_SPEC §3.1) — `evaluation/checkpoint.py` captures an arm's memory (the frozen M7 arm
+  memory view) as a frozen, **order-independent, content-addressed** snapshot; A0's is empty by
+  construction; forming one writes nothing. Identity excludes the arm, so an empty checkpoint has one
+  identity shared by every arm.
+- **Held-out evaluation set** (M8_SPEC §3.2) — `evaluation/heldout_set.py` surfaces the held-out partition
+  read-only via the frozen M4 loader, carrying the manifest hash; no available task leaks in.
+- **Deterministic context assembly** (M8_SPEC §3.3) — `evaluation/context.py` assembles the attempt prompt
+  from a fixed task portion plus a fixed rendering of retrieved memory; **only memory content may vary**,
+  so an empty checkpoint yields a bit-for-bit identical prompt across arms; no domain parsing.
+- **Memory-conditioned attempt** (M8_SPEC §3.3) — `evaluation/attempt.py` is the single identical harness:
+  A0 memoryless, A1/A2 conditioned read-only via the frozen M6 retriever used stateless/no-cache, driving
+  the **unchanged** frozen proposer and verifier; the per-task seed reuses the frozen M5 `derive_task_seed`.
+- **Segregated record + sink** (M8_SPEC §3.4) — `evaluation/record.py` + `evaluation/sink.py`: the
+  `EvaluationRecord` carries the deterministic verdict + secondary + frozen token counts (no model score,
+  no new metric, no `content_hash`); the sink is a plain JSONL distinct from the experience log, is not a
+  memory source, and never touches `GuardedEpisodeWriter` (D8).
+- **Content-addressed provenance** (M8_SPEC §3.5) — `evaluation/provenance.py`: a SHA-256 identity over
+  the checkpoint identity, manifest hash, arm, base model, evaluation seed, and cost-guard limits; same
+  evaluation → same identity, any component change → new identity.
+- **Cost-guarded runner** (M8_SPEC §3.5/§5) — `evaluation/runner.py` sweeps one (arm, checkpoint), writing
+  each record to the sink under the evaluation identity, bounded by the frozen M5 `CostGuard` (composed,
+  not modified), halting loudly with **no partial record**; it refuses a mismatched provenance loudly.
+- **Permanent held-out-safety invariant** (M8_SPEC §3.5) —
+  `tests/unit/test_evaluation_heldout_safety_invariant.py` proves, structurally and behaviourally, that
+  `evaluation/**` never reaches the experience path, computes no statistic, holds retrieval stateless, and
+  fails loudly on an invalid measurement; and that the guarded boundary still fail-closes (non-vacuity).
+- **A0 untouched, composition only** — the `batch`/A0 runner, `retrieval` substrate, `arms` layer, episode
+  schema, store, index, corpus layer, task type, verifier, and LLM client are unmodified. The only M0–M7
+  change is the additive M8 `core/config.py` settings. Future principles D24/D25 are recorded but not
+  implemented (D23).
+- **Prototype Gate** (M8_SPEC §7) — assessed **not required**: M8 asserts no unproven environmental
+  mechanism, composing already-proven parts in the same determinism envelope A0's live sweep uses (D18).
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `40b5545` | feat: evaluation settings (M8-C1) |
+| `ba0e54d` | feat: evaluation checkpoint (M8-C2) |
+| `13ddddc` | feat: held-out evaluation set access (M8-C3) |
+| `e3323c2` | feat: deterministic evaluation context assembly (M8-C4) |
+| `6af7c0b` | feat: memory-conditioned held-out attempt (M8-C5) |
+| `44748f3` | feat: segregated evaluation record and sink (M8-C6) |
+| `fa126c3` | feat: evaluation provenance (M8-C7) |
+| `e60661a` | feat: held-out evaluation runner (M8-C8) |
+| `1b0fdd8` | test: held-out safety and identical-harness invariant (M8-C9) |
+| `1eb11e5` | test: hermetic m8 held-out evaluation acceptance (M8-C10) |
+
+The frozen M8 specification and handoff were tracked in `49d9f75`; the D7-invariant/lint restoration that
+preceded M8-C5 is `0df9c0b` + `0d23345`.
+
+**Definition of Done — all satisfied (M8_SPEC §6, handoff §9).** A checkpoint is order-independent,
+content-addressed, and immutable, A0's empty (1); A0/A1/A2 evaluate on held-out through one identical
+harness, empty-checkpoint prompts bit-identical (2); the memory-conditioned attempt drives the frozen loop
+with stateless retrieval, proposer/verifier unmodified (3); every outcome is the deterministic verifier
+verdict with secondary and frozen token counts, never a model score (4); records land only in the
+segregated sink, no held-out episode enters memory or the experience log, the boundary fail-closes (5);
+evaluation is deterministic for a fixed (arm, checkpoint, task, seed) (6); each record carries a
+content-addressed evaluation identity and the sweep halts loudly with no partial record (7); no statistic
+or decision is computed (8); domain-neutrality holds, no frozen M0–M7 file is modified beyond the additive
+settings, and all four gates are green with zero M8-attributable skips (9). **Verification evidence:**
+`docker compose build verifier && docker compose run --rm verifier` — `ruff check`, `ruff format --check`,
+`mypy src tests`, `pytest -q` all green across M8-C1..C10; M8 adds no network-isolation-gated test and no
+live model/network path, so `pytest -q` reports zero M8-attributable skips (handoff §7).
+
+## 12. Readiness for M9
+
+M9 is the **pre-registration freeze** (D12): fixing, before any comparative statistic is computed, the
+held-out split, the checkpoints, the arms, and the analysis plan — so the Stage-1 statistics and go/no-go
+of M10 cannot be chosen after seeing results. M8 delivers exactly what M9 pre-registers: a deterministic,
+content-addressed held-out evaluation whose identity binds every measurement to one checkpoint and split,
+recorded in a segregated sink and computing no statistic itself. The held-out partition stays mechanically
+enforced, every experience write passes the single guarded boundary, the JSONL log stays authoritative,
+and A0 remains the memoryless baseline. No M8 work blocks M9.
+
+**Repository is M9-ready.** Begin M9 only against its own ratified engineering specification and
+implementation handoff, in the same atomic, gate-verified workflow used for M1–M8.

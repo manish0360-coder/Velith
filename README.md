@@ -556,3 +556,59 @@ be void, not merely degraded; a permanent check enforces this and fails loudly o
 - `VELITH_ACTIVE_ARM` — the arm a run operates under, and therefore (by the fixed binding) its
   write-filter. One of `A1` | `A2` (default `A1`, the control). `A0` and any unknown arm are
   rejected at startup.
+
+## M8 — frozen checkpointed held-out evaluation
+
+M8 is the program's first **measurement**: it evaluates each arm (A0, A1, A2) against the
+**held-out** partition at a **frozen checkpoint**, through one identical, deterministic harness,
+and records each per-task outcome as a **segregated measurement** that can never become
+experience. It composes onto the frozen M0–M7 substrate and changes nothing else. M8 **measures**;
+it does not conclude — no statistic and no decision (those are M9/M10).
+
+### Checkpoints
+
+A checkpoint pins **what an arm knows** at the moment of evaluation: an order-independent,
+**content-addressed**, immutable capture of the arm's M7 memory snapshot. `A0`'s checkpoint is
+empty by construction. The identity excludes the arm, so an empty checkpoint has one identity
+shared by every arm — the foundation of the exact cold-start control below. Forming a checkpoint
+writes nothing.
+
+### The held-out measure
+
+The evaluation set is the **held-out** partition (read-only, via the frozen M4 loader). It is the
+generalization measure precisely because the guarded boundary structurally prevented any arm from
+retaining it (D8). The recorded outcome is the **deterministic verifier verdict** on the held-out
+hidden test — with the held-out secondary / model-gap signal — plus **only** the already-frozen
+deterministic token counts. Never a model score, never an LLM-as-judge, never a new metric.
+
+### The identical memory-conditioned harness
+
+One attempt path serves all three arms: `A0` attempts memorylessly; `A1`/`A2` condition the
+**unchanged** frozen proposer on their retrieved memory at the checkpoint (the frozen M6 retriever,
+used **stateless / no-cache**). Conditioning is caller-side prompt assembly in which **only the
+retrieved-memory portion may vary** — so at an **empty checkpoint the prompt is bit-for-bit
+identical across A0/A1/A2**. The per-task seed reuses the frozen M5 `derive_task_seed`, so
+evaluation is deterministic for a fixed `(arm, checkpoint, task, seed)`.
+
+### The segregated sink and the held-out lock
+
+Records are written **only** to a segregated sink — a plain JSONL distinct from the experience log,
+which is **not** a memory source. The evaluation layer **never** touches `GuardedEpisodeWriter`, so
+a held-out outcome can never become experience; and, independently, the guarded boundary still
+fail-closes on a held-out identity. A permanent invariant test enforces this (and "no statistic")
+structurally and behaviourally.
+
+### Evaluation identity and the cost guard
+
+Each evaluation carries a content-addressed `EvaluationProvenance` (checkpoint identity, manifest
+hash, arm, base model, evaluation seed, cost-guard limits) that binds every record to one
+checkpoint and split. The sweep is bounded by the frozen M5 `CostGuard` and halts loudly with **no
+partial record**.
+
+### Relevant settings
+
+- `VELITH_EVAL_SEED` — the fixed seed each held-out task's per-attempt seed is derived from.
+- `VELITH_EVAL_SINK_PATH` — the segregated evaluation sink (distinct from the experience log; never
+  a memory source).
+- `VELITH_EVAL_MAX_TASKS` / `VELITH_EVAL_MAX_ATTEMPTS_PER_TASK` / `VELITH_EVAL_MAX_TOKENS` — the
+  evaluation cost-guard limits (`0` means unbounded).
