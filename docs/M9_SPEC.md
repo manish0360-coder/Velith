@@ -9,8 +9,8 @@ results — so the Stage-1 statistics and decision of M10 cannot be chosen after
 (`DECISIONS.md`), the vision (`VISION.md`), and the roadmap (D12). It contains no implementation, no
 pseudocode, no code, no handoff, no commit plan, no tests, and no migration plan. Once frozen it is
 immutable; the M9 implementation is *extracted from* it and never redesigns it.
-**Status:** FROZEN — ratified by the Research Director; immutable (the M9 implementation is extracted from it and never redesigns it).
-**Date:** 2026-07-06 (draft). **Freeze date:** 2026-09-17.
+**Status:** FROZEN (OED-2 amendment) — re-ratified by the Research Director on 2026-09-18; supersedes the prior freeze `m9-spec-frozen` (`36659cb`). Immutable; the M9 implementation is extracted from it and never redesigns it.
+**Date:** 2026-07-06 (draft). **Freeze date:** 2026-09-17 (original). **Re-freeze date (OED-2):** 2026-09-18.
 **Depends on:** `m8-complete` (frozen checkpointed held-out evaluation and its content-addressed
 evaluation identity), atop the frozen M7 arms, M6 retrieval substrate, M5 batch runner and cold arm A0,
 M4 corpus and held-out lock, M3 episode store/index, and M1/M2 loop and hardened verifier.
@@ -20,6 +20,18 @@ D23. Future guidance D24/D25 is **not** implemented (D23).
 > **Manufacturing-pipeline position:** Specification → Scientific Review → Feasibility Prototype
 > (conditional) → Research Director Review → Freeze Specification → Implementation Handoff →
 > Engineering → Verification → Freeze Milestone. This document is the Specification artifact.
+
+> **M9 Amendment OED-2 (2026-09-18).** *Reason:* engineering identified a genuine incompatibility between
+> M8's time-invariant A0 empty checkpoint and M9's K>1 longitudinal GEE — the original shared interaction
+> model is unimplementable against a static baseline. *Scientific authority:* Scientific Review (final OED-2
+> ruling), authorized by the Research Director. *Affected model (only):* the K>1 **A1 vs A0** comparison
+> becomes the additive `verdict ~ checkpoint_id_c + arm`, with A0 time-invariant at `checkpoint_id_c = 0`
+> (not replicated across checkpoints) and its gap-widens test carried by the `checkpoint_id_c` coefficient;
+> the confirmatory family's second test changes from the A1/A0 interaction to the A1/A0 checkpoint trend.
+> *Unchanged:* the A2 vs A1 interaction model, the K=1 McNemar path, the EMM definition and delta-method SE,
+> robust sandwich covariance, the four-test Holm-Bonferroni family, α = 0.01, GO/NO-GO, checkpoint-identity
+> binding, completeness, and model-failure handling — every other M9 provision remains exactly as frozen at
+> `m9-spec-frozen` (`36659cb`).
 
 ---
 
@@ -112,7 +124,8 @@ before M10 runs:
   deterministic verifier verdict (D3), never from a model score (D11) and never from task content (D9/D22).
 - **Statistic / test** — for K > 1, a GEE (Binomial family, logit link, exchangeable working correlation,
   robust sandwich covariance) yielding, per adjacent-arm comparison, a response-scale EMM superiority test
-  and a log-odds-ratio interaction (gap-widens) test; for K = 1, the exact one-sided McNemar test. Fully
+  and a log-odds-ratio gap-widens test (the `checkpoint_id_c` coefficient for A1 vs A0; the
+  `checkpoint_id_c × arm` interaction for A2 vs A1); for K = 1, the exact one-sided McNemar test. Fully
   specified in §3.5. M9 declares it, M10 applies it.
 - **Go/no-go decision rule and threshold** — the pre-committed rule that maps the four confirmatory
   p-values (K > 1) or the two McNemar p-values (K = 1) to a binary program decision by Holm-Bonferroni at
@@ -174,11 +187,16 @@ mechanically, with no analyst discretion. M9 records only the plan and never rea
 - **3.5.3 Statistical model (K > 1).** A Generalized Estimating Equation (GEE) with the **Binomial**
   family, **logit** link, and **exchangeable** working correlation structure, with `task_id` as the group
   identifier. All standard errors use the **robust (sandwich) covariance estimator**; model-based standard
-  errors are not used. Model formula: `verdict ~ checkpoint_id_c + arm + checkpoint_id_c * arm`. Variable
-  encoding: `arm` is treatment/dummy coded (for A1 vs A0: A0 = 0, A1 = 1; for A2 vs A1: A1 = 0, A2 = 1);
-  `checkpoint_id_c` is the ordered checkpoint index `1, 2, ..., K` over the pre-registered
-  content-addressed checkpoint schedule (§3.1), mean-centered before entering the model. One model is
-  fitted per adjacent-arm comparison (A1 vs A0, and A2 vs A1).
+  errors are not used. **Model formulas (OED-2):** the **A1 vs A0** comparison uses the **additive** model
+  `verdict ~ checkpoint_id_c + arm` (no interaction term); the **A2 vs A1** comparison uses
+  `verdict ~ checkpoint_id_c + arm + checkpoint_id_c * arm`. Variable encoding: `arm` is treatment/dummy
+  coded (for A1 vs A0: A0 = 0, A1 = 1; for A2 vs A1: A1 = 0, A2 = 1); `checkpoint_id_c` is the ordered
+  checkpoint index `1, 2, ..., K` over the pre-registered content-addressed checkpoint schedule (§3.1),
+  mean-centered before entering the model. **A0 is time-invariant:** A0 is evaluated once — its empty
+  checkpoint identity is constant across the schedule (M8) — so exactly **one** A0 observation per task
+  enters the model, **not replicated** across checkpoints, at **`checkpoint_id_c = 0`** (the mean of the
+  centered index). One model is fitted per adjacent-arm comparison (A1 vs A0 additive; A2 vs A1 with
+  interaction).
 - **3.5.4 Estimands and tests (K > 1).** For each of the two models:
   - *Overall superiority (EMM).* The estimand is the difference in Estimated Marginal Means of passing
     probability on the **response scale**, averaged with **uniform weight 1/K** across all `K`
@@ -191,15 +209,19 @@ mechanically, with no analyst discretion. M9 records only the plan and never rea
     complete fitted coefficient vector** and `V_robust` is the robust sandwich covariance matrix from the
     same fitted GEE. The one-sided test is `Z = EMM_diff / SE(EMM_diff)`, `p = 1 - Phi(Z)`; the
     alternative is `EMM_diff > 0`.
-  - *Gap-widens trend (interaction).* The estimand is `beta_interaction`, the coefficient of the
-    `checkpoint_id_c * arm` interaction term — the change in the log-odds ratio per unit increase in
-    checkpoint index. The one-sided **Wald** test uses the robust covariance:
-    `Z = beta_interaction / SE(beta_interaction)`, `p = 1 - Phi(Z)`; the alternative is
-    `beta_interaction >= 0`.
+  - *Gap-widens trend.* **A1 vs A0 (additive model):** because A0 is time-invariant, the trend estimand is
+    `beta_checkpoint`, the coefficient of `checkpoint_id_c` — the per-unit-checkpoint change in A1's
+    log-odds of passing while A0 stays constant. One-sided **Wald** test on the robust covariance:
+    `Z = beta_checkpoint / SE(beta_checkpoint)`, `p = 1 - Phi(Z)`; the alternative is `beta_checkpoint > 0`.
+    **A2 vs A1 (interaction model):** the trend estimand is `beta_interaction`, the coefficient of the
+    `checkpoint_id_c * arm` interaction term — the difference in learning rate between A2 and A1. One-sided
+    **Wald** test on the robust covariance: `Z = beta_interaction / SE(beta_interaction)`,
+    `p = 1 - Phi(Z)`; the alternative is `beta_interaction >= 0`.
   - *Semantic lock (scale of "gap widens").* For M9, "gap widens" / "advantage is non-decreasing" is
-    operationally defined **exclusively on the model's log-odds-ratio scale**: it means
-    `beta_interaction >= 0`, where `beta_interaction` is the coefficient of `checkpoint_id_c × arm`. This
-    does **not** assert that the raw probability difference is non-decreasing.
+    operationally defined **exclusively on the model's log-odds-ratio scale**: for A1 vs A0 it means
+    `beta_checkpoint > 0` (the `checkpoint_id_c` coefficient); for A2 vs A1 it means `beta_interaction >= 0`
+    (the `checkpoint_id_c × arm` coefficient). This does **not** assert that the raw probability difference
+    is non-decreasing.
 - **3.5.5 The K = 1 case.** If the pre-registered schedule contains exactly one checkpoint, GEE is **not**
   used. The analysis reverts exactly to the frozen Version-1 procedure: two **exact one-sided McNemar
   tests** on the adjacent paired arms — `H_a1: P(A1_pass) > P(A0_pass)` and
@@ -209,7 +231,7 @@ mechanically, with no analyst discretion. M9 records only the plan and never rea
   McNemar tests to pass the two-test Holm procedure. The gap-widening hypothesis is **untestable when
   K = 1**: it is **not** treated as empirically tested and **not** automatically passed.
 - **3.5.6 Multiplicity (K > 1).** The primary confirmatory family contains **four** p-values: (1) EMM
-  A1 vs A0, (2) interaction A1 vs A0, (3) EMM A2 vs A1, (4) interaction A2 vs A1. The **Holm-Bonferroni**
+  A1 vs A0, (2) checkpoint trend A1 vs A0, (3) EMM A2 vs A1, (4) interaction A2 vs A1. The **Holm-Bonferroni**
   procedure controls the family-wise error rate at `α = 0.01`. Order the four p-values
   `p(1) <= p(2) <= p(3) <= p(4)` and reject sequentially, stopping at the first non-rejection: reject
   `H(1)` if `p(1) <= 0.01/4`; then `H(2)` if `p(2) <= 0.01/3`; then `H(3)` if `p(3) <= 0.01/2`; then
@@ -229,8 +251,9 @@ mechanically, with no analyst discretion. M9 records only the plan and never rea
   and the incomplete-run void (§3.5.1); the ordered compounding hypothesis and its two components
   (§3.5.2); the GEE with Binomial family, logit link, and exchangeable working correlation, the robust
   sandwich covariance, treatment coding, and the mean-centered checkpoint index (§3.5.3); the uniform 1/K
-  response-scale EMM superiority estimand and its delta-method standard error, the interaction trend
-  estimand, and the one-sided Z / Wald tests (§3.5.4); the K = 1 exact one-sided McNemar procedure and its
+  response-scale EMM superiority estimand and its delta-method standard error, the trend estimands (the
+  A1-vs-A0 `checkpoint_id_c` coefficient and the A2-vs-A1 `checkpoint_id_c × arm` interaction), and the
+  one-sided Z / Wald tests (§3.5.4); the K = 1 exact one-sided McNemar procedure and its
   two-test Holm rule (§3.5.5); the four-test confirmatory Holm-Bonferroni family at `α = 0.01` (§3.5.6);
   the deterministic model-failure handling (`p = 1.0` -> NO-GO, §3.5.7); and the deterministic GO/NO-GO
   rule (§3.5.8). M10 is thereby a deterministic function from the frozen M8 records to a single GO or
@@ -290,8 +313,8 @@ M9 is complete when all of the following hold (verified in-container and in CI a
    limits — bound to exactly the M8 evaluation identity components.
 2. The record fixes the **analysis plan** in full (§3.5) — the primary hypothesis, the primary
    **verifier-derived** binary endpoint (§3.5.1, named and fully specified, not computed), the K > 1 GEE
-   with its response-scale EMM superiority test and log-odds-ratio interaction (gap-widens) test
-   (§3.5.3-§3.5.4), the K = 1 exact one-sided McNemar procedure (§3.5.5), the four-test Holm-Bonferroni
+   with its response-scale EMM superiority test and log-odds-ratio gap-widens test (the `checkpoint_id_c`
+   coefficient for A1 vs A0; the `checkpoint_id_c × arm` interaction for A2 vs A1) (§3.5.3-§3.5.4), the K = 1 exact one-sided McNemar procedure (§3.5.5), the four-test Holm-Bonferroni
    family at family-wise α = 0.01 (§3.5.6), and the deterministic model-failure handling and GO/NO-GO rule
    (§3.5.7-§3.5.8) — all declared, none executed.
 3. The pre-registration carries a **content-addressed, immutable identity**: the same plan yields the same
