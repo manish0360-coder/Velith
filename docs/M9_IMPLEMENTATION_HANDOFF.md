@@ -78,7 +78,7 @@ Proposed ownership: a new **`src/velith/analysis/`** package (Velith layer; depe
 3. Additive `Settings`: `prereg_path` (record location), and the declared statistic/threshold identifiers
    (validated against a closed set; values are α=0.01, McNemar/GEE ids per §3.5).
 
-**P2 — analysis executor (frozen §3.5 procedure; milestone per OED-1):**
+**P2 — analysis executor (frozen §3.5 procedure; OED-1 resolved — M9 builds P1 + P2, P2 synthetic-tested only; M10 executes on the real sink):**
 4. `analysis/binder.py` — deterministic join: for the pre-registered design, compute each
    `(checkpoint_identity, arm)`→`EvaluationProvenance.identity`, select matching records from the sink,
    group by `(task_identity, checkpoint_index, arm)`; build the per-task `(A0,A1,A2)` observations across the
@@ -89,7 +89,7 @@ Proposed ownership: a new **`src/velith/analysis/`** package (Velith layer; depe
    whole task; report included `n`.
 7. `analysis/mcnemar.py` — the frozen **K=1** exact one-sided McNemar (§3.5.5): discordant `b,c`; conditional
    `B~Binomial(b+c,0.5)`; `p=P(B>=b)`; `b+c=0 ⇒ p=1.0`; two-test Holm at α=0.01.
-8. `analysis/gee.py` — the **K>1** GEE fit (§3.5.3) via the chosen library (OED-3): Binomial/logit/
+8. `analysis/gee.py` — the **K>1** GEE fit (§3.5.3) via `statsmodels==0.15.0` array API (OED-3/4): Binomial/logit/
    exchangeable, `task_id` groups, robust sandwich covariance, treatment coding, mean-centered checkpoint
    index, with **two distinct formulas (OED-2, frozen):** A1 vs A0 additive `verdict ~ checkpoint_id_c + arm`
    (A0 single obs at `checkpoint_id_c = 0`); A2 vs A1 `verdict ~ checkpoint_id_c + arm + checkpoint_id_c*arm`.
@@ -188,22 +188,29 @@ reject sequentially at `0.01/4, 0.01/3, 0.01/2, 0.01/1`, stopping at first non-r
 ## 7. Solver determinism
 
 The scientific plan is frozen; M10 reproducibility requires the *computational* behavior to be pinned. The
-following must be fixed **before** implementation. Values not derivable from `m9-spec-frozen` or the repo are
-flagged in §15 and MUST NOT be silently chosen.
+following are now **resolved** (see §15); only the exact resolved transitive dependency matrix remains
+**pending in-container verification** (OED-3) and must be locked in the pinned image, never hand-picked.
 
-- **Statistical library + exact version** — the repo currently has **no** numeric/stats dependency (deps are
-  only `pydantic`, `pydantic-settings`). GEE + robust sandwich has no in-repo implementation. → **OED-3**.
-- **GEE API / estimator / covariance type** — exact class, `cov_type`, family/link/correlation objects. →
-  OED-3.
-- **maxiter, convergence tolerance, start_params** — pinned explicitly (no library defaults left implicit). →
-  OED-4.
-- **Numerical precision / BLAS determinism** — whether bit-for-bit float equality is required on the pinned
-  image or a documented comparison tolerance governs p-value/decision reproducibility. → OED-5.
-- **Deterministic, pinned:** treatment/reference coding (A0=0 etc.; A1=0 for A2vA1); checkpoint index `1..K`;
-  mean-centering `x_k = k − (K+1)/2`; inverse-logit `σ(η)=1/(1+e^{−η})` with overflow-safe evaluation;
-  analytic EMM gradient (§6); matrix ops `gᵀVg` via the pinned library. These are pinned here (not open).
-- **mypy --strict** over untyped stats libraries — stub/`additional_dependencies` or scoped ignore strategy.
-  → OED-6.
+- **Library (OED-3, resolved):** `statsmodels==0.15.0` in a new `[project.optional-dependencies] analysis`
+  group, installed in the verifier image + CI. Verified: `requires-python >=3.10` (covers 3.12.7); cp312
+  manylinux wheels published; declared deps `numpy<3,>=1.23.5`, `scipy>=1.8,!=1.9.2`, `pandas>=1.4,!=2.1.0`,
+  `patsy>=0.5.6`, `formulaic>=1.1.0`, `packaging>=21.3` satisfiable. **PENDING:** the exact resolved pin
+  matrix — resolve, lock, and gate-verify in `python:3.12.7-slim-bookworm`; do not hand-pick versions.
+- **GEE construction (OED-4, resolved):** the statsmodels **array API** (numpy `endog`/`exog`/`groups`; no
+  formula/patsy/formulaic at the call site). `family=Binomial()` (logit link), `cov_struct=Exchangeable()`,
+  `.fit(cov_type='robust', maxiter=100, ctol=1e-8, start_params=None)`. Explicit design-matrix columns —
+  A1vA0 `[intercept, checkpoint_id_c, arm]`; A2vA1 `[intercept, checkpoint_id_c, arm, checkpoint_id_c*arm]`.
+  Non-convergence/singular/non-finite → frozen §3.5.7 (`p=1.0` → NO-GO).
+- **Determinism (OED-5, resolved):** exact pins + the pinned image + single-thread numeric execution
+  (`OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1`), retaining `PYTHONHASHSEED=0`.
+  Standard: same-image repeated execution yields identical decision and result identity. Record dependency
+  versions, solver configuration, thread configuration, and per-model convergence flags in provenance.
+- **Deterministic, pinned:** treatment/reference coding (A0=0, A1=1; A1=0, A2=1); checkpoint index `1..K`;
+  mean-centering `x_k = k − (K+1)/2`; overflow-safe inverse-logit `σ(η)=1/(1+e^{−η})`; the analytic EMM
+  gradient (§6, 3-D for A1vA0 / 4-D for A2vA1); matrix op `gᵀVg`.
+- **Typing (OED-6, resolved):** keep global `mypy --strict`; add scoped
+  `[[tool.mypy.overrides]] module=["statsmodels.*"] ignore_missing_imports=true`; isolate statsmodels behind
+  a typed adapter (`analysis/gee.py`) returning a typed frozen result; numpy stays typed.
 
 ## 8. Failure semantics (deterministic)
 
@@ -216,13 +223,15 @@ Defined by `m9-spec-frozen` (implement as stated):
   p-values = `1.0` → deterministic **NO-GO** (§3.5.7).
 - K=1 zero discordance (`b+c=0`) → `p=1.0` (§3.5.5).
 
-**Not defined by the frozen spec → do NOT invent a scientific rule; see §15:**
-- Zero included tasks after complete-case (`n=0`) — OED-7a.
-- Zero-variance / all-concordant endpoint at K>1 (degenerate GEE design matrix) vs the §3.5.7 failure set —
-  OED-7b.
-- Duplicate records / duplicate `(evaluation_identity, task_identity)`; malformed verdict outside the frozen
-  taxonomy; inconsistent arm records; invalid/unknown checkpoint identity not in the pre-registered schedule —
-  OED-7c (these are data-integrity errors; the spec does not name their disposition).
+Resolved dispositions (OED-7):
+- Zero included tasks after complete-case (`n=0`) → **VOID** (frozen §3.5.11 — a procedural halt, not an
+  inferential NO-GO).
+- Zero-variance / all-concordant endpoint at K>1 (degenerate design → singular robust covariance or
+  non-finite coefficient/SE) → inside the frozen §3.5.7 failure set → `p=1.0` → **NO-GO**.
+- Data-integrity errors — duplicate records / duplicate `(evaluation_identity, task_identity)`; malformed
+  verdict outside the frozen taxonomy; inconsistent arm records; unknown checkpoint identity not in the
+  pre-registered schedule → **loud typed error, halt** (corrupt-input validation; not an inferential
+  outcome, invents no statistic).
 
 ## 9. Provenance
 
@@ -244,7 +253,8 @@ coding both comparisons; (6) EMM value; (7) analytic EMM
 gradient — 3-D `[β0,β_checkpoint,β_arm]` for A1vA0 and 4-D `[…,β_interaction]` for A2vA1 — vs an independent
 high-precision reference; (8) delta-method `sqrt(gᵀVg)`; (9) trend tests — A1vA0 `checkpoint_id_c` Wald and
 A2vA1 interaction Wald, each one-sided; (10) one-sided p-values; (11) four-test Holm ordering/stop/thresholds; (12) each
-model-failure branch→NO-GO; (13) missing-task complete-case exclusion + `n`; (14) global-incomplete→void;
+model-failure branch→NO-GO; (13) missing-task complete-case exclusion + `n`; (14) global-incomplete→void; (14b) `n=0` after complete-case→VOID (§3.5.11); (14c) degenerate/singular
+GEE→NO-GO and data-integrity error→loud typed error;
 (15) checkpoint-identity mismatch/unknown; (16) repeated-execution determinism (identical inputs→identical
 GO/NO-GO and result identity). Pre-registration tests: identity stability; any component change→new identity;
 write-once immutability; sealed-from-results import boundary.
@@ -259,10 +269,10 @@ hermetic (no held-out outcomes as fixtures; no network).
 
 ## 12. Implementation sequence (atomic; each leaves gates green)
 
-Pending §15 resolution and RD approval. Proposed order — P1 first (unblocks freeze-of-plan), P2 after OED-3/4/5/6:
+Engineering OEDs resolved (§15); only the exact dependency matrix is pending in-container lock (OED-3). Order — P1 first (unblocks freeze-of-plan), then P2:
 1. Additive `Settings` (`prereg_path`, statistic/threshold identifiers). 2. `preregistration.py` + identity.
 3. write-once `prereg_store.py` + sealed-from-results import-boundary test. 4. `encoding.py`. 5.
-`completeness.py`. 6. `binder.py`. 7. `mcnemar.py` (K=1). 8. `gee.py` (K>1) [after OED-3/4]. 9. `emm.py`
+`completeness.py`. 6. `binder.py`. 7. `mcnemar.py` (K=1). 8. `gee.py` (K>1) [statsmodels array API]. 9. `emm.py`
 (analytic delta-method). 10. `trend.py` (A1vA0 checkpoint Wald; A2vA1 interaction Wald). 11. `holm.py`. 12. `decision.py`. 13. `result_record.py`.
 14. integration + determinism tests. One atomic commit per unit; stop after each per the locked workflow.
 
@@ -284,37 +294,45 @@ with nothing silently chosen. **Implementation DoD is deferred to the post-appro
 
 ## 15. OPEN ENGINEERING DECISIONS (must be resolved before implementation — not invented here)
 
-- **OED-1 (scope boundary M9 vs M10).** `M9_SPEC §2/§3.5` states M9 *fixes* the plan and "executes nowhere;
-  M10 applies it," yet this handoff's mandate enumerates the full statistical executor. Decision required:
-  does the M9 milestone **build + synthetic-test** the P2 executor (never run on held-out results), or is P2
-  deferred to M10 with M9 delivering only the pre-registration artifact (P1)? Recommendation (spec-faithful):
-  M9 = P1 + P2 code built and tested on synthetic fixtures only; M10 = first execution on real records.
+- **OED-1 (scope boundary M9 vs M10) — RESOLVED.** M9 builds **P1** (pre-registration) **and P2** (the
+  analysis executor); P2 is unit-tested on **synthetic fixtures only** and never run on held-out results in
+  M9. **M10** executes the analysis against the real M8 evaluation sink. Spec-faithful (§3.5 "executed
+  nowhere in M9; M10 applies it").
 - **OED-2 (A0 empty-checkpoint → schedule index) — RESOLVED (frozen: `m9-spec-frozen-oed2` / `3d98a84`).**
   Scientific Review ruling: A0 is time-invariant with a single empty-checkpoint identity, so it yields **one**
   observation per task at `checkpoint_id_c = 0`, **not** replicated across K. The **A1 vs A0** model is
   therefore **additive** (`verdict ~ checkpoint_id_c + arm`), its gap-widens test the `checkpoint_id_c`
   coefficient; **A2 vs A1** retains the interaction model. Encoded in §4–§8 and §10 above; no open decision
   remains.
-- **OED-3 (GEE library + version).** No numeric/stats dependency exists in the repo. GEE + exchangeable
-  correlation + robust sandwich requires a library (canonically `statsmodels` + `numpy`/`scipy`; transitively
-  `pandas`/`patsy`). Adding it is a significant footprint change to a deliberately minimal pure-pydantic
-  project. Exact library and pinned versions are not derivable from the spec/repo. **RD/architecture ruling
-  required.**
-- **OED-4 (solver parameters).** `maxiter`, convergence tolerance, and `start_params` for the chosen GEE
-  implementation must be pinned to explicit values (defaults exist but the spec pins none). Requires
-  ratification once OED-3 is fixed.
-- **OED-5 (numeric reproducibility standard).** Whether M9/M10 requires bit-for-bit float identity on the
-  pinned image (BLAS-sensitive) or a documented comparison tolerance for p-values/decision. The frozen spec
-  says "deterministic function" but iterative FP GEE may not be bit-identical across backends. Ruling needed
-  on the reproducibility/verification criterion.
-- **OED-6 (mypy --strict + untyped stats libs).** Strategy to keep `mypy --strict` green over statsmodels/
-  numpy (partial/no stubs): pinned stub packages, `additional_dependencies`, or a scoped, justified ignore.
-- **OED-7 (spec-silent failure cases).** (a) `n=0` after complete-case; (b) zero-variance/all-concordant K>1
-  design vs the §3.5.7 failure set; (c) duplicate/malformed/inconsistent/unknown-checkpoint records. The
-  frozen spec does not define these; a deterministic disposition must be ruled (likely "loud typed error /
-  void" to match the spec's conservatism) — **do not create a statistical fallback silently.**
-- **OED-8 (package placement/ownership).** Confirm the new code lives in a single Velith-layer package
-  (proposed `src/velith/analysis/`), read-only-dependent on `evaluation`/`arms`/`corpus`/`episodes`, with no
-  reverse dependency and no new cross-layer coupling (MiniFlyWire→Noetica→Velith→Mini Prometheus preserved).
+- **OED-3 (GEE library + version) — RESOLVED (matrix verification PENDING).** `statsmodels==0.15.0` in a new
+  `[project.optional-dependencies] analysis` group (installed in the verifier image + CI). Verified against
+  PyPI: `requires-python >=3.10` (covers 3.12.7), cp312 manylinux wheels published, declared deps
+  `numpy<3,>=1.23.5` / `scipy>=1.8,!=1.9.2` / `pandas>=1.4,!=2.1.0` / `patsy>=0.5.6` / `formulaic>=1.1.0` /
+  `packaging>=21.3` satisfiable. **PENDING:** the exact resolved transitive pin matrix must be locked and
+  gate-verified in `python:3.12.7-slim-bookworm` — not hand-picked here.
+- **OED-4 (solver parameters) — RESOLVED.** statsmodels **array API** with explicit deterministic design
+  matrices (A1vA0 `[intercept, checkpoint_id_c, arm]`; A2vA1 `[intercept, checkpoint_id_c, arm,
+  checkpoint_id_c*arm]`); frozen `family=Binomial()`/logit, `cov_struct=Exchangeable()`, `cov_type='robust'`;
+  `maxiter=100`, `ctol=1e-8`, `start_params=None`. Non-convergence → frozen §3.5.7 (`p=1.0` → NO-GO).
+- **OED-5 (numeric reproducibility standard) — RESOLVED.** Exact dependency pins + the pinned image +
+  single-thread numeric execution (`OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1`),
+  retaining `PYTHONHASHSEED=0`. Standard: same-image repeated execution yields identical decision and result
+  identity. Record dependency versions, solver config, thread config, and convergence flags in provenance.
+- **OED-6 (mypy --strict + untyped stats libs) — RESOLVED.** Keep global `mypy --strict`; add scoped
+  `[[tool.mypy.overrides]] module=["statsmodels.*"] ignore_missing_imports=true`; isolate statsmodels behind
+  a typed adapter (`analysis/gee.py`). numpy ships `py.typed` and stays fully typed.
+- **OED-7 (empty-dataset / degenerate / integrity) — RESOLVED.** `n=0` after complete-case → **VOID**
+  (frozen §3.5.11, `m9-spec-frozen-oed7` — procedural halt, not NO-GO). Zero-variance/all-concordant K>1
+  (singular covariance / non-finite) → frozen §3.5.7 → `p=1.0` → NO-GO. Data-integrity errors
+  (duplicate/malformed/inconsistent/unknown-checkpoint) → loud typed error, halt (input validation, no
+  statistic invented).
+- **OED-8 (package placement/ownership) — RESOLVED.** New Velith-layer package `src/velith/analysis/` (peer
+  of `arms`/`evaluation`/`corpus`), read-only-dependent on `evaluation`/`arms`/`corpus`/`episodes`, no reverse
+  dependency, no new cross-layer coupling (MiniFlyWire→Noetica→Velith→Mini Prometheus preserved). Modules:
+  `preregistration.py`, `prereg_store.py`, `encoding.py`, `completeness.py`, `binder.py`, `mcnemar.py`,
+  `gee.py`, `emm.py`, `trend.py`, `holm.py`, `decision.py`, `result_record.py`; additive `Settings` in
+  `core/config.py`.
 
-**Until OED-1..OED-8 are resolved by the Research Director, implementation MUST NOT begin.**
+**All engineering OEDs (1–8) are RESOLVED.** The only remaining pre-implementation item is the in-container
+lock + gate verification of the exact statsmodels dependency matrix (OED-3, PENDING). Implementation begins
+on RD authorization, on a Python 3.12.7 + Docker host.
