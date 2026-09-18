@@ -9,8 +9,8 @@ results — so the Stage-1 statistics and decision of M10 cannot be chosen after
 (`DECISIONS.md`), the vision (`VISION.md`), and the roadmap (D12). It contains no implementation, no
 pseudocode, no code, no handoff, no commit plan, no tests, and no migration plan. Once frozen it is
 immutable; the M9 implementation is *extracted from* it and never redesigns it.
-**Status:** FROZEN (OED-2 amendment) — re-ratified by the Research Director on 2026-09-18; supersedes the prior freeze `m9-spec-frozen` (`36659cb`). Immutable; the M9 implementation is extracted from it and never redesigns it.
-**Date:** 2026-07-06 (draft). **Freeze date:** 2026-09-17 (original). **Re-freeze date (OED-2):** 2026-09-18.
+**Status:** FROZEN (OED-7 amendment) — re-ratified by the Research Director on 2026-09-18; supersedes the prior freezes `m9-spec-frozen-oed2` (`3d98a84`) and `m9-spec-frozen` (`36659cb`). Immutable; the M9 implementation is extracted from it and never redesigns it.
+**Date:** 2026-07-06 (draft). **Freeze date:** 2026-09-17 (original). **Re-freeze date (OED-2):** 2026-09-18. **Re-freeze date (OED-7):** 2026-09-18.
 **Depends on:** `m8-complete` (frozen checkpointed held-out evaluation and its content-addressed
 evaluation identity), atop the frozen M7 arms, M6 retrieval substrate, M5 batch runner and cold arm A0,
 M4 corpus and held-out lock, M3 episode store/index, and M1/M2 loop and hardened verifier.
@@ -32,6 +32,14 @@ D23. Future guidance D24/D25 is **not** implemented (D23).
 > robust sandwich covariance, the four-test Holm-Bonferroni family, α = 0.01, GO/NO-GO, checkpoint-identity
 > binding, completeness, and model-failure handling — every other M9 provision remains exactly as frozen at
 > `m9-spec-frozen` (`36659cb`).
+
+> **M9 Amendment OED-7 (2026-09-18).** *Authorized by the Scientific Review Council.* Concerns only the
+> `n=0` empty-dataset disposition: if complete-case exclusion (§3.5.1) leaves zero analysis tasks, the M10
+> analysis halts with outcome **VOID** — a procedural halt, not an inferential NO-GO. Added as §3.5.11 below;
+> all other M9 provisions, including the OED-2 amendment, remain unchanged. (Placement note: the ruling's
+> "§7.5 / section 7 / §1.3" labels are Version-5 standalone numbering; in this frozen document the rule is
+> §3.5.11 and the complete-case rule it references is §3.5.1 — authoritative wording preserved, labels
+> adapted to this document's structure.)
 
 ---
 
@@ -258,6 +266,10 @@ mechanically, with no analyst discretion. M9 records only the plan and never rea
   the deterministic model-failure handling (`p = 1.0` -> NO-GO, §3.5.7); and the deterministic GO/NO-GO
   rule (§3.5.8). M10 is thereby a deterministic function from the frozen M8 records to a single GO or
   NO-GO verdict.
+- **3.5.11 Empty dataset (OED-7).** If, after applying the complete-case exclusion rule (§3.5.1), the
+  resulting analysis dataset contains `n=0` tasks, the statistical procedure cannot be computed. In this
+  event, the M10 analysis will halt and the final outcome for the pre-registration will be recorded as
+  **VOID**. This is a procedural halt, not an inferential NO-GO verdict.
 
 ## 4. Interfaces (composition contract — shape only)
 
