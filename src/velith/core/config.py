@@ -161,6 +161,17 @@ class Settings(BaseSettings):
     # NOTE (M8_SPEC §5, forbidden): no per-arm retrieval setting, and no statistic,
     # threshold, or decision parameter (that is M9/M10). M8 measures; it does not conclude.
 
+    # --- M9 settings (pre-registration; M9_SPEC §5) ---
+    # Where the single immutable pre-registration record is written. Distinct from the
+    # experience log (`episode_path`) and the evaluation sink (`eval_sink_path`) — the
+    # pre-registration is neither experience nor a held-out outcome (§3.3/§3.4).
+    #
+    # NOTE: the declared statistic identifier and decision threshold (M9_SPEC §5) are
+    # deliberately NOT core Settings — they are frozen plan content carried by the
+    # immutable PreRegistration record (`velith.analysis.preregistration`), so this shared
+    # Settings surface holds no statistic/threshold/decision knob (M8_SPEC §5 invariant).
+    prereg_path: Path = Path("data/analysis/preregistration.json")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
