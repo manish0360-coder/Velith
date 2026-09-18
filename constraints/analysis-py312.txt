@@ -1,0 +1,45 @@
+# constraints/analysis-py312.txt — exact resolved dependency lock for the M9 analysis
+# environment, captured via `pip freeze` INSIDE velith-verifier:m0, built from
+# python:3.12.7-slim-bookworm@sha256:60d9996b6a8a3689d36db740b49f4327be3be09a21122bd02fb8895abb38b50d
+# (handoff OED-3 / OED-5). The pinned image is the reproducibility boundary.
+#
+# Captured, not hand-picked; do NOT edit versions by hand — regenerate via
+# `docker compose run --rm verifier pip freeze` after any intentional change.
+# Verified green in that image: Python 3.12.7; statsmodels 0.15.0 + GEE/Binomial/
+# Exchangeable API; PYTHONHASHSEED=0, OMP/OPENBLAS/MKL_NUM_THREADS=1; ruff check,
+# ruff format --check, mypy src tests (strict), pytest -q (279 passed).
+# The local `velith @ file:///app` editable entry is intentionally excluded.
+annotated-types==0.8.0
+cfgv==3.5.0
+distlib==0.4.3
+filelock==3.32.7
+formulaic==1.2.2
+identify==2.6.19
+iniconfig==2.3.0
+interface_meta==2.0.1
+mypy==1.11.2
+mypy_extensions==1.1.0
+narwhals==2.26.0
+nodeenv==1.10.0
+numpy==2.5.3
+packaging==26.3
+pandas==3.0.6
+patsy==1.0.3
+platformdirs==4.11.10
+pluggy==1.6.0
+pre-commit==3.8.0
+pydantic==2.9.2
+pydantic-settings==2.5.2
+pydantic_core==2.23.4
+pytest==8.3.3
+python-dateutil==2.9.0.post0
+python-discovery==1.6.1
+python-dotenv==1.2.3
+PyYAML==6.0.3
+ruff==0.6.9
+scipy==1.18.1
+six==1.17.0
+statsmodels==0.15.0
+typing_extensions==4.16.0
+virtualenv==21.7.13
+wrapt==2.4.1

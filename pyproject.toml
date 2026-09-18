@@ -22,6 +22,13 @@ dev = [
     "pytest==8.3.3",
     "pre-commit==3.8.0",
 ]
+# M9 analysis stack (handoff OED-3/OED-6): isolated optional group, installed only in
+# the verifier image + CI. Only statsmodels is pinned here; its exact transitive matrix
+# (numpy/scipy/pandas/patsy/formulaic/packaging + transitives) is locked in
+# constraints/analysis-py312.txt, resolved inside python:3.12.7-slim-bookworm (OED-5).
+analysis = [
+    "statsmodels==0.15.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/velith"]
@@ -56,6 +63,13 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 disallow_any_generics = true
 no_implicit_reexport = true
+
+# Scoped override (M9 handoff OED-6): statsmodels ships no type stubs. Confined to
+# statsmodels.* so `mypy --strict` stays global everywhere else; statsmodels is isolated
+# behind the typed analysis/gee.py adapter (implemented in a later M9 commit, not now).
+[[tool.mypy.overrides]]
+module = ["statsmodels.*"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

@@ -12,7 +12,11 @@ FROM python:3.12.7-slim-bookworm
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONHASHSEED=0 \
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
 
 WORKDIR /app
 
@@ -27,8 +31,14 @@ RUN apt-get update \
 # Install dependencies first (better layer caching). The package build needs the
 # metadata, the readme, and the source tree.
 COPY pyproject.toml README.md ./
+COPY constraints/ ./constraints/
 COPY src/ ./src/
-RUN pip install ".[dev]"
+# M9-C1: base + dev + analysis stacks. The analysis stack (statsmodels, numpy, scipy,
+# pandas, patsy, formulaic, ...) is pinned to the exact matrix resolved INSIDE this
+# pinned image and captured in constraints/analysis-py312.txt — the reproducibility
+# boundary (handoff OED-3/OED-5). A comment-only constraints file imposes nothing on the
+# first (bootstrap) resolve; once populated it pins the exact transitive graph.
+RUN pip install -c constraints/analysis-py312.txt ".[dev,analysis]"
 
 # Tests are not part of the installed package; copy them in for execution.
 COPY tests/ ./tests/
