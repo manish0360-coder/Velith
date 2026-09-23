@@ -311,16 +311,108 @@ def test_no_go_is_representable() -> None:
     assert record.verify_identity()
 
 
-def test_void_is_representable() -> None:
-    void = decide_kgt1(completeness_status=CompletenessStatus.VOID_EMPTY)
-    record = _build(
-        decision=void,
-        completeness=CompletenessResult(CompletenessStatus.VOID_EMPTY, (), (_hex("t1"),), 0),
+# --- VOID: no Holm family, no fabricated statistics (spec 3.5.1 / 3.5.11) ---
+
+
+def _void_completeness(
+    status: CompletenessStatus = CompletenessStatus.VOID_EMPTY,
+    excluded: tuple[str, ...] = (),
+) -> CompletenessResult:
+    return CompletenessResult(status, (), excluded, 0)
+
+
+def _build_void(
+    *,
+    status: CompletenessStatus = CompletenessStatus.VOID_EMPTY,
+    excluded: tuple[str, ...] = (),
+    preregistration: PreRegistration | None = None,
+) -> AnalysisResultRecord:
+    """A VOID record built with no HolmResult at all — never a fabricated one."""
+    return build_result_record(
+        preregistration=_prereg() if preregistration is None else preregistration,
+        completeness=_void_completeness(status, excluded),
+        decision=decide_kgt1(completeness_status=status),
+        evaluation_records=_records(),
     )
+
+
+def test_void_record_is_built_without_a_holm_result() -> None:
+    record = _build_void(excluded=(_hex("t1"), _hex("t2")))
     assert record.outcome == "VOID"
-    assert record.completeness_status == "VOID_EMPTY"
+    assert record.hypotheses == ()
+    assert record.family_size == 0
     assert record.n_included_tasks == 0
+    assert record.included_task_identities == ()
+    assert record.excluded_task_identities == (_hex("t1"), _hex("t2"))
+    assert record.completeness_status == "VOID_EMPTY"
     assert record.verify_identity()
+
+
+def test_void_record_fabricates_no_p_value_or_threshold() -> None:
+    record = _build_void()
+    assert record.hypotheses == ()
+    assert record.family_size == 0
+    # to_dict() preserves the frozen tuple representation; canonical JSON renders it as
+    # an empty array. Neither carries a p-value or a per-test threshold.
+    assert record.to_dict()["hypotheses"] == ()
+    serialized = serialize_result_record(record)
+    assert '"hypotheses":[]' in serialized
+    assert '"p_value"' not in serialized
+    assert '"threshold"' not in serialized
+    # The pre-registered family-wise level is design provenance, declared before the run;
+    # it is not a computed per-test threshold.
+    assert record.alpha == _prereg().alpha == 0.01
+
+
+def test_void_record_identity_is_deterministic() -> None:
+    assert _build_void().identity == _build_void().identity
+    assert _build_void() == _build_void()
+
+
+def test_void_identity_changes_with_meaningful_content() -> None:
+    base = _build_void(excluded=(_hex("t1"),))
+    more_excluded = _build_void(excluded=(_hex("t1"), _hex("t2")))
+    assert more_excluded.identity != base.identity
+    global_incomplete = _build_void(status=CompletenessStatus.VOID_GLOBAL_INCOMPLETE)
+    assert global_incomplete.completeness_status == "VOID_GLOBAL_INCOMPLETE"
+    assert global_incomplete.identity != base.identity
+
+
+def test_void_identity_differs_from_a_decided_record() -> None:
+    assert _build_void().identity != _build().identity
+
+
+def test_void_refuses_a_supplied_holm_family() -> None:
+    with pytest.raises(ResultRecordError, match="no Holm"):
+        build_result_record(
+            preregistration=_prereg(),
+            completeness=_void_completeness(),
+            decision=decide_kgt1(completeness_status=CompletenessStatus.VOID_EMPTY),
+            evaluation_records=_records(),
+            holm_result=_holm(),
+        )
+
+
+@pytest.mark.parametrize("p_values", [_P_VALUES, (0.0001, 0.0002, 0.0003, 0.02)])
+def test_decided_outcomes_require_a_holm_result(p_values: tuple[float, ...]) -> None:
+    decision = _decision(_holm(p_values))
+    assert decision.outcome is not DecisionOutcome.VOID
+    with pytest.raises(ResultRecordError, match="required"):
+        build_result_record(
+            preregistration=_prereg(),
+            completeness=_completeness(),
+            decision=decision,
+            evaluation_records=_records(),
+        )
+
+
+def test_void_record_persists_with_write_once_semantics(tmp_path: Path) -> None:
+    record = _build_void()
+    target = write_result_record(record, tmp_path)
+    assert target == tmp_path / f"{record.identity}.json"
+    assert list(tmp_path.iterdir()) == [target]
+    with pytest.raises(FileExistsError):
+        write_result_record(record, tmp_path)
 
 
 # ---------------------------------------------------------------------------

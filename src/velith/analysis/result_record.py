@@ -44,7 +44,7 @@ from typing import Any, Final
 
 from velith import __version__
 from velith.analysis.completeness import CompletenessResult
-from velith.analysis.decision import DecisionResult
+from velith.analysis.decision import DecisionOutcome, DecisionResult
 from velith.analysis.gee import SolverProvenance
 from velith.analysis.holm import HolmResult
 from velith.analysis.preregistration import PreRegistration
@@ -159,9 +159,9 @@ def build_result_record(
     *,
     preregistration: PreRegistration,
     completeness: CompletenessResult,
-    holm_result: HolmResult,
     decision: DecisionResult,
     evaluation_records: Iterable[EvaluationRecord],
+    holm_result: HolmResult | None = None,
     solver_provenance: SolverProvenance | None = None,
     checkpoint_values: Sequence[float] = (),
 ) -> AnalysisResultRecord:
@@ -169,6 +169,13 @@ def build_result_record(
 
     Every field is copied from its upstream source; nothing is recomputed, reinterpreted,
     or adjusted. The identity is computed last, over the complete payload.
+
+    ``holm_result`` is **omitted for a VOID analysis** (§3.5.1 / §3.5.11): a VOID run is a
+    procedural halt that executes no statistical test, so no Holm family exists for it.
+    Such a record carries ``hypotheses = ()`` and ``family_size = 0`` — no p-value and no
+    per-test threshold is fabricated, because VOID is not NO-GO. Supplying a Holm family
+    alongside a VOID decision is contradictory input and is refused. A GO or NO-GO
+    analysis conversely **requires** the Holm result it was decided from.
     """
     provenance = AnalysisProvenance(
         preregistration_identity=preregistration.identity,
@@ -190,21 +197,41 @@ def build_result_record(
             () if solver_provenance is None else tuple(solver_provenance.thread_env)
         ),
     )
-    hypotheses = tuple(
-        HypothesisRecord(
-            label=entry.label,
-            p_value=entry.p_value,
-            rank=entry.rank,
-            threshold=entry.threshold,
-            rejected=entry.rejected,
+    hypotheses: tuple[HypothesisRecord, ...]
+    if decision.outcome is DecisionOutcome.VOID:
+        if holm_result is not None:
+            raise ResultRecordError(
+                "a VOID analysis executes no statistical test, so it carries no Holm "
+                "family; recording one would assert statistics that were never computed"
+            )
+        # The pre-registered family-wise level is design provenance, declared before the
+        # run and true whether or not any test executed. It is not a computed threshold.
+        alpha = preregistration.alpha
+        family_size = 0
+        hypotheses = ()
+    else:
+        if holm_result is None:
+            raise ResultRecordError(
+                f"a {decision.outcome.value} analysis is decided from a Holm family; "
+                "the HolmResult it was decided from is required"
+            )
+        alpha = holm_result.alpha
+        family_size = holm_result.family_size
+        hypotheses = tuple(
+            HypothesisRecord(
+                label=entry.label,
+                p_value=entry.p_value,
+                rank=entry.rank,
+                threshold=entry.threshold,
+                rejected=entry.rejected,
+            )
+            for entry in holm_result.decisions
         )
-        for entry in holm_result.decisions
-    )
     draft = AnalysisResultRecord(
         outcome=decision.outcome.value,
         reason=decision.reason,
-        alpha=holm_result.alpha,
-        family_size=holm_result.family_size,
+        alpha=alpha,
+        family_size=family_size,
         hypotheses=hypotheses,
         completeness_status=completeness.status.value,
         n_included_tasks=completeness.n,
