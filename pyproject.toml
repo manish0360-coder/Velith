@@ -64,11 +64,12 @@ warn_unused_ignores = true
 disallow_any_generics = true
 no_implicit_reexport = true
 
-# Scoped override (M9 handoff OED-6): statsmodels ships no type stubs. Confined to
-# statsmodels.* so `mypy --strict` stays global everywhere else; statsmodels is isolated
-# behind the typed analysis/gee.py adapter (implemented in a later M9 commit, not now).
+# Scoped override (M9 handoff OED-6): statsmodels and scipy ship no type stubs. Confined
+# to those two namespaces so `mypy --strict` stays global everywhere else; statsmodels is
+# isolated behind the typed analysis/gee.py adapter (M9-C8) and scipy behind the typed
+# analysis/wald.py adapter (M9-C10).
 [[tool.mypy.overrides]]
-module = ["statsmodels.*"]
+module = ["statsmodels.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]
