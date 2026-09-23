@@ -19,7 +19,7 @@ from scipy.stats import norm
 from velith.analysis import wald as wald_mod
 from velith.analysis.emm import EmmResult
 from velith.analysis.gee import DESIGN_COLUMNS, Comparison
-from velith.analysis.wald import InferenceError, WaldResult, compute_wald
+from velith.analysis.wald import InferenceError, WaldResult, compute_wald, one_sided_wald
 
 
 def _emm(delta: float, se: float) -> EmmResult:
@@ -257,3 +257,65 @@ def test_result_carries_exactly_the_contract_fields() -> None:
         "z_stat",
         "p_value",
     }
+
+
+# ---------------------------------------------------------------------------
+# The shared one-sided Wald primitive (M9-C11 refactor)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("delta", "se"),
+    [
+        (0.2, 0.05),
+        (-0.2, 0.05),
+        (0.0, 0.05),
+        (1e-3, 1e-13),
+        (0.25, 0.0),
+        (-0.25, 0.0),
+        (0.0, 0.0),
+    ],
+)
+def test_compute_wald_delegates_to_the_shared_primitive(delta: float, se: float) -> None:
+    result = compute_wald(_emm(delta, se))
+    z_stat, p_value = one_sided_wald(delta, se)
+    # One implementation of the frozen arithmetic, shared with the trend tests.
+    assert result.z_stat == z_stat
+    assert result.p_value == p_value
+
+
+def test_primitive_returns_the_frozen_zero_se_dispositions() -> None:
+    assert one_sided_wald(0.25, 0.0) == (math.inf, 0.0)
+    assert one_sided_wald(-0.25, 0.0) == (-math.inf, 1.0)
+    assert one_sided_wald(0.0, 0.0) == (0.0, 1.0)
+
+
+def test_primitive_uses_the_ordinary_rule_at_positive_se() -> None:
+    z_stat, p_value = one_sided_wald(0.2, 0.05)
+    assert z_stat == 0.2 / 0.05
+    assert p_value == float(norm.sf(z_stat))
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_primitive_validates_both_inputs(bad: float) -> None:
+    with pytest.raises(InferenceError, match="estimate must be finite"):
+        one_sided_wald(bad, 0.05)
+    with pytest.raises(InferenceError, match="standard_error must be finite"):
+        one_sided_wald(0.2, bad)
+
+
+def test_primitive_rejects_a_negative_standard_error() -> None:
+    with pytest.raises(InferenceError, match="non-negative"):
+        one_sided_wald(0.2, -0.05)
+
+
+def test_estimate_name_labels_the_message_without_changing_arithmetic() -> None:
+    with pytest.raises(InferenceError, match="beta_checkpoint must be finite"):
+        one_sided_wald(float("nan"), 0.05, estimate_name="beta_checkpoint")
+    # The label is cosmetic: the numbers are identical whatever it is called.
+    assert one_sided_wald(0.2, 0.05) == one_sided_wald(0.2, 0.05, estimate_name="beta")
+
+
+def test_compute_wald_preserves_the_emm_specific_message() -> None:
+    with pytest.raises(InferenceError, match="emm_difference must be finite"):
+        compute_wald(_emm(float("nan"), 0.05))

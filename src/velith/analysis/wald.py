@@ -71,6 +71,40 @@ class WaldResult:
     p_value: float
 
 
+def one_sided_wald(
+    estimate: float, standard_error: float, *, estimate_name: str = "estimate"
+) -> tuple[float, float]:
+    """The frozen one-sided Wald ``(z_stat, p_value)`` for an estimate and its robust SE.
+
+    This is the single implementation of the frozen arithmetic described in this module's
+    docstring. Every M9 one-sided Wald — the EMM superiority tests (§3.5.4) and the
+    gap-widens trend tests (§3.5.4) — routes through it, so the rule and its zero-SE
+    disposition exist in exactly one place and cannot drift apart.
+
+    ``estimate_name`` only labels the validation message; it changes no arithmetic.
+
+    Raises :class:`InferenceError` if either input is non-finite, or if the standard error
+    is negative.
+    """
+    if not math.isfinite(estimate):
+        raise InferenceError(f"{estimate_name} must be finite, got {estimate!r}")
+    if not math.isfinite(standard_error):
+        raise InferenceError(f"standard_error must be finite, got {standard_error!r}")
+    if standard_error < 0.0:
+        raise InferenceError(f"standard_error must be non-negative, got {standard_error!r}")
+
+    if standard_error > 0.0:
+        # The ordinary rule, applied at every positive SE however small: no threshold,
+        # no floor, no clipping. A tiny SE legitimately yields a very large |Z|.
+        z_stat = estimate / standard_error
+        return z_stat, float(norm.sf(z_stat))
+    if estimate > 0.0:
+        return math.inf, 0.0
+    if estimate < 0.0:
+        return -math.inf, 1.0
+    return 0.0, 1.0
+
+
 def compute_wald(emm: EmmResult) -> WaldResult:
     """Compute the frozen one-sided Wald test for one C9 EMM contrast.
 
@@ -80,29 +114,7 @@ def compute_wald(emm: EmmResult) -> WaldResult:
     """
     delta_emm = emm.emm_difference
     se_emm = emm.standard_error
-
-    if not math.isfinite(delta_emm):
-        raise InferenceError(f"emm_difference must be finite, got {delta_emm!r}")
-    if not math.isfinite(se_emm):
-        raise InferenceError(f"standard_error must be finite, got {se_emm!r}")
-    if se_emm < 0.0:
-        raise InferenceError(f"standard_error must be non-negative, got {se_emm!r}")
-
-    if se_emm > 0.0:
-        # The ordinary rule, applied at every positive SE however small: no threshold,
-        # no floor, no clipping. A tiny SE legitimately yields a very large |Z|.
-        z_stat = delta_emm / se_emm
-        p_value = float(norm.sf(z_stat))
-    elif delta_emm > 0.0:
-        z_stat = math.inf
-        p_value = 0.0
-    elif delta_emm < 0.0:
-        z_stat = -math.inf
-        p_value = 1.0
-    else:
-        z_stat = 0.0
-        p_value = 1.0
-
+    z_stat, p_value = one_sided_wald(delta_emm, se_emm, estimate_name="emm_difference")
     return WaldResult(
         delta_emm=delta_emm,
         se_emm=se_emm,
