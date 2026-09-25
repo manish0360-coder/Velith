@@ -36,6 +36,7 @@ _TASK2 = hashlib.sha256(b"task2").hexdigest()
 def _prereg() -> PreRegistration:
     return PreRegistration.build(
         manifest_hash=hashlib.sha256(b"manifest").hexdigest(),
+        verification_manifest_hash=hashlib.sha256(b"verification-manifest").hexdigest(),
         checkpoint_identities=_CPS,
         base_model="qwen2.5-coder",
         eval_seed=0,
@@ -55,6 +56,7 @@ def _eval_identity(prereg: PreRegistration, checkpoint_identity: str, arm: str) 
         max_tasks=prereg.max_tasks,
         max_attempts_per_task=prereg.max_attempts_per_task,
         max_tokens=prereg.max_tokens,
+        verification_manifest_hash=prereg.verification_manifest_hash,
     ).identity
 
 

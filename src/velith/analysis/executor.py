@@ -10,6 +10,8 @@ standard-error floor, and no post-hoc reclassification. It modifies nothing in M
 **Pre-flight (before any statistical execution).** The sealed design is verified against the
 environment and the observed sink *before* a single statistic is computed:
 
+* the pre-registration's M9 VM2 lineage (``spec_version``); mixed-version joins are
+  rejected;
 * the pre-registration's content-addressed integrity (``verify_identity``) — the §3.4 seal
   itself is a structural property of M9-C2 (it imports no sink or record surface, enforced
   by an import-boundary test), not a runtime flag;
@@ -21,8 +23,9 @@ environment and the observed sink *before* a single statistic is computed:
   and must not be coupled to it;
 * every observed ``evaluation_identity`` resolving to the reconstructed expected set.
 
-The manifest hash and the checkpoint identities are **not** compared as plaintext, because
-neither the sink nor an evaluation record carries them. They are *inputs* to
+The manifest hash, the verification manifest hash and the checkpoint identities are **not**
+compared as plaintext, because neither the sink nor an evaluation record carries them.
+They are *inputs* to
 ``EvaluationProvenance.identity``, so resolving observed identities against the
 reconstructed expected set is a **cryptographic** check of both: a wrong manifest or a
 wrong checkpoint yields a different digest and fails to resolve.
@@ -64,7 +67,7 @@ from velith.analysis.emm import compute_emm
 from velith.analysis.gee import Comparison, GeeFailure, GeeFit, SolverProvenance, fit_gee
 from velith.analysis.holm import HolmResult, LabeledPValue, holm_bonferroni
 from velith.analysis.mcnemar import mcnemar_test
-from velith.analysis.preregistration import ARMS, PreRegistration
+from velith.analysis.preregistration import ARMS, SPEC_VERSION, PreRegistration
 from velith.analysis.result_record import (
     AnalysisResultRecord,
     build_result_record,
@@ -73,7 +76,7 @@ from velith.analysis.result_record import (
 from velith.analysis.trend import compute_trend
 from velith.analysis.wald import compute_wald
 from velith.arms.identity import Arm
-from velith.evaluation.provenance import EvaluationProvenance
+from velith.evaluation.provenance import IDENTITY_VERSION, EvaluationProvenance
 from velith.evaluation.record import EvaluationRecord
 from velith.evaluation.sink import EvaluationSink
 
@@ -121,6 +124,8 @@ def _provenance_identity(
         max_tasks=preregistration.max_tasks,
         max_attempts_per_task=preregistration.max_attempts_per_task,
         max_tokens=preregistration.max_tokens,
+        verification_manifest_hash=preregistration.verification_manifest_hash,
+        identity_version=IDENTITY_VERSION,
     ).identity
 
 
@@ -187,6 +192,11 @@ def run_preflight(
         raise ExecutionError(
             "pre-registration integrity check failed: stored identity "
             f"{preregistration.identity} != recomputed {preregistration.compute_identity()}"
+        )
+    if preregistration.spec_version != SPEC_VERSION:
+        raise ExecutionError(
+            f"pre-registration spec_version {preregistration.spec_version!r} is not the "
+            f"identity-v2 lineage {SPEC_VERSION!r}; mixed-version joins are rejected"
         )
     if tuple(preregistration.arms) != ARMS:
         raise ExecutionError(

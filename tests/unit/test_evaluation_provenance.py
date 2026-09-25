@@ -12,10 +12,18 @@ import dataclasses
 
 import pytest
 
-from velith.evaluation.provenance import EvaluationProvenance
+from velith.evaluation.provenance import (
+    IDENTITY_VERSION,
+    EvaluationProvenance,
+    EvaluationProvenanceError,
+)
 
-#: The eight identity components and a distinct replacement value for each.
+_VM_HASH = "a" * 64
+
+#: The ten identity-v2 components and a distinct replacement value for each (D29).
 _COMPONENT_CHANGES = {
+    "identity_version": "m8-evaluation-identity-v1",
+    "verification_manifest_hash": "b" * 64,
     "checkpoint_identity": "other-checkpoint",
     "manifest_hash": "other-manifest",
     "arm": "A2",
@@ -37,6 +45,7 @@ def _provenance() -> EvaluationProvenance:
         max_tasks=0,
         max_attempts_per_task=1,
         max_tokens=0,
+        verification_manifest_hash=_VM_HASH,
     )
 
 
@@ -67,6 +76,8 @@ def test_all_components_are_present() -> None:
         dataclasses.replace(_provenance(), max_tasks=7),
         dataclasses.replace(_provenance(), max_attempts_per_task=3),
         dataclasses.replace(_provenance(), max_tokens=50000),
+        dataclasses.replace(_provenance(), verification_manifest_hash="b" * 64),
+        dataclasses.replace(_provenance(), identity_version="m8-evaluation-identity-v1"),
     ],
 )
 def test_identity_changes_when_any_component_changes(changed: EvaluationProvenance) -> None:
@@ -89,3 +100,19 @@ def test_identity_binds_results_to_one_checkpoint_and_split() -> None:
     other_split = dataclasses.replace(base, manifest_hash="manifest-2")
     assert other_checkpoint.identity != base.identity
     assert other_split.identity != base.identity
+
+
+def test_identity_v2_payload_has_exactly_ten_keys_and_the_v2_version() -> None:
+    """The v2 payload is exactly the ten D29 keys; classifier identity is not one."""
+    payload = _provenance().to_dict()
+    assert len(payload) == 10
+    assert payload["identity_version"] == IDENTITY_VERSION == "m8-evaluation-identity-v2"
+    assert payload["verification_manifest_hash"] == _VM_HASH
+    assert not any("classifier" in key for key in payload)
+
+
+@pytest.mark.parametrize("bad", ["", "not-a-hash", "A" * 64, "a" * 63])
+def test_non_concrete_verification_manifest_hash_is_rejected(bad: str) -> None:
+    """A missing or malformed verification manifest hash fails closed (D29 case 13)."""
+    with pytest.raises(EvaluationProvenanceError):
+        dataclasses.replace(_provenance(), verification_manifest_hash=bad)

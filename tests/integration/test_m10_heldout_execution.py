@@ -39,6 +39,7 @@ _A0_CHECKPOINT = _hex("a0-empty-checkpoint")
 def _prereg(checkpoint_count: int, *, manifest: str = "manifest") -> PreRegistration:
     return PreRegistration.build(
         manifest_hash=_hex(manifest),
+        verification_manifest_hash=_hex("verification-manifest"),
         checkpoint_identities=tuple(_hex(f"cp{i}") for i in range(1, checkpoint_count + 1)),
         base_model="synthetic-base",
         eval_seed=7,
@@ -60,6 +61,7 @@ def _record(
         max_tasks=prereg.max_tasks,
         max_attempts_per_task=prereg.max_attempts_per_task,
         max_tokens=prereg.max_tokens,
+        verification_manifest_hash=prereg.verification_manifest_hash,
     ).identity
     return EvaluationRecord(
         evaluation_identity=identity,

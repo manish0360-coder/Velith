@@ -36,7 +36,7 @@ from typing import Final
 from velith.analysis.encoding import encode_record
 from velith.analysis.preregistration import PreRegistration
 from velith.arms.identity import Arm
-from velith.evaluation.provenance import EvaluationProvenance
+from velith.evaluation.provenance import IDENTITY_VERSION, EvaluationProvenance
 from velith.evaluation.record import EvaluationRecord
 
 #: A concrete content-addressed identity is a lowercase SHA-256 hex digest (64 chars).
@@ -82,6 +82,8 @@ def _provenance_identity(prereg: PreRegistration, *, checkpoint_identity: str, a
         max_tasks=prereg.max_tasks,
         max_attempts_per_task=prereg.max_attempts_per_task,
         max_tokens=prereg.max_tokens,
+        verification_manifest_hash=prereg.verification_manifest_hash,
+        identity_version=IDENTITY_VERSION,
     ).identity
 
 

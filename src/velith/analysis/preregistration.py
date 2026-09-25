@@ -27,9 +27,9 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from velith.arms.identity import Arm
 from velith.episodes.episode import compute_content_hash
 
-# --- Frozen M9 plan constants (transcribed from m9-spec-frozen-oed7; not decisions) ----
-#: The frozen M9 specification lineage this pre-registration is extracted from.
-SPEC_VERSION: Final[str] = "m9-spec-frozen-oed7"
+# --- Frozen M9 plan constants (transcribed from m9-spec-frozen-oed7-vm2; not decisions) -
+#: The frozen M9 specification lineage this pre-registration is extracted from (VM2).
+SPEC_VERSION: Final[str] = "m9-spec-frozen-oed7-vm2"
 #: The single verifier-derived endpoint: PASSED = 1, every other verdict = 0 (§3.5.1).
 PRIMARY_ENDPOINT: Final[str] = "binary_passed"
 #: The closed-set statistic identifier: K>1 GEE (EMM + trend) and K=1 exact McNemar (§3.5).
@@ -81,6 +81,8 @@ class PreRegistration(BaseModel):
     spec_version: str
     arms: tuple[str, ...]
     manifest_hash: str
+    # M9 VM2: SHA-256 of the held-out VerificationManifest (M8 identity v2 component).
+    verification_manifest_hash: str
     checkpoint_identities: tuple[str, ...]
     base_model: str
     eval_seed: int
@@ -124,6 +126,16 @@ class PreRegistration(BaseModel):
             )
         return value
 
+    @field_validator("verification_manifest_hash")
+    @classmethod
+    def _validate_verification_manifest(cls, value: str) -> str:
+        if not _SHA256_HEX.match(value):
+            raise ValueError(
+                "verification_manifest_hash is not a concrete content-addressed SHA-256 hex "
+                f"digest: {value!r}"
+            )
+        return value
+
     def _content(self) -> dict[str, Any]:
         """The declared components hashed into the identity (everything but ``identity``)."""
         content = self.model_dump()
@@ -143,6 +155,7 @@ class PreRegistration(BaseModel):
         cls,
         *,
         manifest_hash: str,
+        verification_manifest_hash: str,
         checkpoint_identities: tuple[str, ...],
         base_model: str,
         eval_seed: int,
@@ -172,6 +185,7 @@ class PreRegistration(BaseModel):
             spec_version=SPEC_VERSION,
             arms=ARMS,
             manifest_hash=manifest_hash,
+            verification_manifest_hash=verification_manifest_hash,
             checkpoint_identities=tuple(checkpoint_identities),
             base_model=base_model,
             eval_seed=eval_seed,

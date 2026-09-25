@@ -10,6 +10,14 @@ base model, the evaluation seed, and the cost-guard limits. It carries a
 * results are only ever comparable **within the same checkpoint and split** — a
   different checkpoint identity or a different manifest hash is a different evaluation.
 
+**Evaluation identity v2 (D29; ``docs/M8_IDENTITY_V2_SPEC.md`` §4).** The hashed payload
+has exactly ten keys: the eight M8 v1 components plus ``identity_version`` (the constant
+:data:`IDENTITY_VERSION`) and ``verification_manifest_hash`` (the SHA-256 of the held-out
+VerificationManifest, :mod:`velith.evaluation.verification_manifest`). ``manifest_hash``
+keeps its v1 name and meaning (the full-corpus partition manifest hash) and is distinct
+from ``verification_manifest_hash``. Classifier identity is not a component. M8 v1
+identities remain historical and are reproducible at the v1 code (``b14d918``).
+
 It is a standalone identity record; it adds no field to the episode identity (D21/D22)
 and computes **no statistic and no decision** (D22). The hashing mirrors the frozen
 episode's canonical serialization (sorted keys, tight separators, UTF-8, SHA-256) so the
@@ -20,7 +28,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
+from typing import Final
+
+#: The M8 evaluation identity version (D29; M8 identity v2 §4.1). M8 v1 has none.
+IDENTITY_VERSION: Final[str] = "m8-evaluation-identity-v2"
+
+#: A verification manifest hash is a lowercase SHA-256 hex digest (64 chars).
+_SHA256_HEX: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{64}$")
+
+
+class EvaluationProvenanceError(ValueError):
+    """Raised on a malformed evaluation-identity component (loud, typed)."""
 
 
 @dataclass(frozen=True)
@@ -39,10 +59,20 @@ class EvaluationProvenance:
     max_tasks: int
     max_attempts_per_task: int
     max_tokens: int
+    verification_manifest_hash: str
+    identity_version: str = IDENTITY_VERSION
+
+    def __post_init__(self) -> None:
+        if not _SHA256_HEX.match(self.verification_manifest_hash):
+            raise EvaluationProvenanceError(
+                "verification_manifest_hash is not a concrete SHA-256 hex digest: "
+                f"{self.verification_manifest_hash!r}"
+            )
 
     def to_dict(self) -> dict[str, str | int]:
         """A JSON-serializable view of the full evaluation identity's components."""
         return {
+            "identity_version": self.identity_version,
             "checkpoint_identity": self.checkpoint_identity,
             "manifest_hash": self.manifest_hash,
             "arm": self.arm,
@@ -51,6 +81,7 @@ class EvaluationProvenance:
             "max_tasks": self.max_tasks,
             "max_attempts_per_task": self.max_attempts_per_task,
             "max_tokens": self.max_tokens,
+            "verification_manifest_hash": self.verification_manifest_hash,
         }
 
     @property

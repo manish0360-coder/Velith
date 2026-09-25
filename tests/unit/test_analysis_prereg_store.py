@@ -23,6 +23,7 @@ def _cid(seed: str) -> str:
 def _build(**overrides: object) -> PreRegistration:
     kwargs: dict[str, object] = {
         "manifest_hash": _cid("manifest"),
+        "verification_manifest_hash": _cid("verification-manifest"),
         "checkpoint_identities": (_cid("cp1"), _cid("cp2")),
         "base_model": "qwen2.5-coder",
         "eval_seed": 0,

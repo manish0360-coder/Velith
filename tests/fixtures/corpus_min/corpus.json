@@ -1,5 +1,5 @@
 [
-  {"label": "bracket-v1", "material": "part:bracket;holes:4;units:mm", "handle": "fixture-fits"},
-  {"label": "gear-v2", "material": "part:gear;teeth:18;module:1.5", "handle": "meshes-clean"},
-  {"label": "panel-v1", "material": "part:panel;slots:3;units:mm", "handle": "clears-envelope"}
+  {"label": "bracket-v1", "material": "part:bracket;holes:4;units:mm", "handle": "3565badc1bb9378038cba6716343f5657d5fdea8bb083da61d622d12dbba78cc"},
+  {"label": "gear-v2", "material": "part:gear;teeth:18;module:1.5", "handle": "e0ae04e721b29007ecfb606ce5d7e569e42399c1f72a5d2ec2b2ad273fbaf20b"},
+  {"label": "panel-v1", "material": "part:panel;slots:3;units:mm", "handle": "65d6c4be5e99b7b85d9d41eadf840e003767d3516824ff07befcab612956af4f"}
 ]

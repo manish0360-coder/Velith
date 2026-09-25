@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -144,8 +145,22 @@ def _attempt() -> HeldOutAttempt:
     )
 
 
+#: A synthetic, schema-free TaskSpec (universal v2 fixture path, D29 / M8 identity v2 §9).
+_TASKSPEC = b"velith-synthetic-safety-taskspec\n"
+_TASKSPEC_DIGEST = hashlib.sha256(_TASKSPEC).hexdigest()
+
+
+class InMemoryTaskSpecStore:
+    """A content-addressed TaskSpec byte store held in memory (test double)."""
+
+    def read(self, digest: str) -> bytes | None:
+        return _TASKSPEC if digest == _TASKSPEC_DIGEST else None
+
+
 def _held_task(material: str = "M-held") -> CorpusTask:
-    return CorpusTask(label="h", material=material, handle="H", partition=Partition.HELD_OUT)
+    return CorpusTask(
+        label="h", material=material, handle=_TASKSPEC_DIGEST, partition=Partition.HELD_OUT
+    )
 
 
 # --- structural invariants ---------------------------------------------------------
@@ -247,6 +262,7 @@ def test_invalid_measurement_fails_loudly(tmp_path: Path) -> None:
         max_tasks=0,
         max_attempts_per_task=1,
         max_tokens=0,
+        verification_manifest_hash="0" * 64,
     )
     with pytest.raises(EvaluationError):
         run_heldout_evaluation(
@@ -256,5 +272,6 @@ def test_invalid_measurement_fails_loudly(tmp_path: Path) -> None:
             attempt=_attempt(),
             sink=sink,
             guard=CostGuard(0, 1, 0),
+            taskspec_store=InMemoryTaskSpecStore(),
         )
     assert sink.read_all() == ()  # refused before any write

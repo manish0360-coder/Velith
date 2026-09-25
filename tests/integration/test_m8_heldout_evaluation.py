@@ -20,6 +20,7 @@ the M8 Definition of Done (M8_SPEC §6 DoD 1-8):
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,7 @@ from velith.evaluation.provenance import EvaluationProvenance
 from velith.evaluation.record import EvaluationRecord
 from velith.evaluation.runner import run_heldout_evaluation
 from velith.evaluation.sink import EvaluationSink
+from velith.evaluation.verification_manifest import build_verification_manifest
 from velith.harness.verifier_sandbox import Verdict
 from velith.retrieval.embedding import EMBEDDER_NAME, get_embedder
 from velith.retrieval.memory import EpisodeMemory
@@ -46,6 +48,20 @@ from velith.retrieval.retriever import Retriever
 from velith.task import Task
 
 _MANIFEST_HASH = "manifest-hash-1"
+
+#: A synthetic, schema-free TaskSpec (universal v2 fixture path, D29 / M8 identity v2 §9).
+_TASKSPEC = b"velith-synthetic-m8-integration-taskspec\n"
+_TASKSPEC_DIGEST = hashlib.sha256(_TASKSPEC).hexdigest()
+
+
+class InMemoryTaskSpecStore:
+    """A content-addressed TaskSpec byte store held in memory (test double)."""
+
+    def read(self, digest: str) -> bytes | None:
+        return _TASKSPEC if digest == _TASKSPEC_DIGEST else None
+
+
+_STORE = InMemoryTaskSpecStore()
 
 
 class RecordingProposer:
@@ -90,7 +106,8 @@ class OneTaskAdapter:
 
 def _heldout_set(materials: list[str]) -> HeldOutEvaluationSet:
     tasks = tuple(
-        CorpusTask(label=m, material=m, handle="H", partition=Partition.HELD_OUT) for m in materials
+        CorpusTask(label=m, material=m, handle=_TASKSPEC_DIGEST, partition=Partition.HELD_OUT)
+        for m in materials
     )
     return HeldOutEvaluationSet(tasks=tasks, manifest_hash=_MANIFEST_HASH)
 
@@ -109,7 +126,7 @@ def _checkpoint(arm: Arm, memory_path: Path) -> Checkpoint:
     return form_checkpoint(arm, EpisodeMemory(memory_path))
 
 
-def _provenance(checkpoint: Checkpoint) -> EvaluationProvenance:
+def _provenance(checkpoint: Checkpoint, heldout: HeldOutEvaluationSet) -> EvaluationProvenance:
     return EvaluationProvenance(
         checkpoint_identity=checkpoint.identity,
         manifest_hash=_MANIFEST_HASH,
@@ -119,6 +136,9 @@ def _provenance(checkpoint: Checkpoint) -> EvaluationProvenance:
         max_tasks=0,
         max_attempts_per_task=1,
         max_tokens=0,
+        verification_manifest_hash=build_verification_manifest(
+            heldout.tasks, _STORE
+        ).verification_manifest_hash,
     )
 
 
@@ -128,10 +148,11 @@ def _run(arm: Arm, heldout: HeldOutEvaluationSet, tmp_path: Path) -> tuple[Evalu
     return run_heldout_evaluation(
         checkpoint,
         heldout,
-        _provenance(checkpoint),
+        _provenance(checkpoint, heldout),
         attempt=_attempt(),
         sink=sink,
         guard=CostGuard(0, 1, 0),
+        taskspec_store=_STORE,
     )
 
 
@@ -178,10 +199,11 @@ def test_records_land_only_in_the_sink_never_the_experience_log(tmp_path: Path) 
     run_heldout_evaluation(
         checkpoint,
         _heldout_set(["M-a", "M-b"]),
-        _provenance(checkpoint),
+        _provenance(checkpoint, _heldout_set(["M-a", "M-b"])),
         attempt=_attempt(),
         sink=sink,
         guard=CostGuard(0, 1, 0),
+        taskspec_store=_STORE,
     )
 
     assert len(sink.read_all()) == 2
@@ -210,10 +232,11 @@ def test_no_heldout_episode_enters_memory_and_boundary_failcloses(tmp_path: Path
     run_heldout_evaluation(
         checkpoint,
         _heldout_set(["M-held"]),
-        _provenance(checkpoint),
+        _provenance(checkpoint, _heldout_set(["M-held"])),
         attempt=_attempt(),
         sink=EvaluationSink(tmp_path / "eval.jsonl"),
         guard=CostGuard(0, 1, 0),
+        taskspec_store=_STORE,
     )
     # The experience memory is unchanged after evaluation — no held-out leaked in.
     after = EpisodeMemory(episode_log).snapshot()
@@ -231,12 +254,12 @@ def test_evaluation_is_deterministic_for_fixed_inputs(tmp_path: Path) -> None:
 def test_evaluation_identity_is_content_addressed(tmp_path: Path) -> None:
     """DoD 7: records carry the content-addressed identity, bound to checkpoint + split."""
     checkpoint = _checkpoint(Arm.A1, tmp_path / "none.jsonl")
-    provenance = _provenance(checkpoint)
+    provenance = _provenance(checkpoint, _heldout_set(["M-a"]))
     records = _run(Arm.A1, _heldout_set(["M-a"]), tmp_path)
     assert {r.evaluation_identity for r in records} == {provenance.identity}
     # A different arm is a different evaluation identity.
     other = _checkpoint(Arm.A2, tmp_path / "none.jsonl")
-    assert _provenance(other).identity != provenance.identity
+    assert _provenance(other, _heldout_set(["M-a"])).identity != provenance.identity
 
 
 def test_runner_returns_per_task_records_only_no_statistic(tmp_path: Path) -> None:

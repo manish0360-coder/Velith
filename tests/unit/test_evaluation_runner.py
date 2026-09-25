@@ -9,6 +9,7 @@ fails loudly.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from velith.evaluation.heldout_set import HeldOutEvaluationSet
 from velith.evaluation.provenance import EvaluationProvenance
 from velith.evaluation.runner import EvaluationError, run_heldout_evaluation
 from velith.evaluation.sink import EvaluationSink
+from velith.evaluation.verification_manifest import build_verification_manifest
 from velith.harness.verifier_sandbox import Verdict
 from velith.retrieval.embedding import EMBEDDER_NAME, get_embedder
 from velith.retrieval.memory import EpisodeMemory
@@ -33,6 +35,23 @@ from velith.retrieval.retriever import Retriever
 from velith.task import Task
 
 _MANIFEST_HASH = "manifest-hash-1"
+
+#: A synthetic, schema-free TaskSpec (universal v2 fixture path, D29 / M8 identity v2 §9).
+_TASKSPEC = b"velith-synthetic-runner-taskspec\n"
+_TASKSPEC_DIGEST = hashlib.sha256(_TASKSPEC).hexdigest()
+
+
+class InMemoryTaskSpecStore:
+    """A content-addressed TaskSpec byte store held in memory (test double)."""
+
+    def __init__(self, blobs: dict[str, bytes]) -> None:
+        self._blobs = dict(blobs)
+
+    def read(self, digest: str) -> bytes | None:
+        return self._blobs.get(digest)
+
+
+_STORE = InMemoryTaskSpecStore({_TASKSPEC_DIGEST: _TASKSPEC})
 
 
 class StubProposer:
@@ -71,7 +90,9 @@ class OneTaskAdapter:
 
 def _heldout_set(n: int) -> HeldOutEvaluationSet:
     tasks = tuple(
-        CorpusTask(label=f"h{i}", material=f"M-{i}", handle="H", partition=Partition.HELD_OUT)
+        CorpusTask(
+            label=f"h{i}", material=f"M-{i}", handle=_TASKSPEC_DIGEST, partition=Partition.HELD_OUT
+        )
         for i in range(n)
     )
     return HeldOutEvaluationSet(tasks=tasks, manifest_hash=_MANIFEST_HASH)
@@ -91,8 +112,13 @@ def _checkpoint(arm: Arm, tmp_path: Path) -> Checkpoint:
     return form_checkpoint(arm, EpisodeMemory(tmp_path / "none.jsonl"))
 
 
+def _vm_hash(n: int) -> str:
+    """The verification manifest hash of the ``n``-task held-out set (identity v2)."""
+    return build_verification_manifest(_heldout_set(n).tasks, _STORE).verification_manifest_hash
+
+
 def _provenance(
-    checkpoint: Checkpoint, *, max_tasks: int = 0, max_tokens: int = 0
+    checkpoint: Checkpoint, *, n: int, max_tasks: int = 0, max_tokens: int = 0
 ) -> EvaluationProvenance:
     return EvaluationProvenance(
         checkpoint_identity=checkpoint.identity,
@@ -103,6 +129,7 @@ def _provenance(
         max_tasks=max_tasks,
         max_attempts_per_task=1,
         max_tokens=max_tokens,
+        verification_manifest_hash=_vm_hash(n),
     )
 
 
@@ -110,7 +137,7 @@ def test_sweep_evaluates_heldout_end_to_end_writing_to_sink_only(tmp_path: Path)
     """Every held-out task yields one record in the sink under the evaluation identity."""
     checkpoint = _checkpoint(Arm.A1, tmp_path)
     heldout = _heldout_set(3)
-    provenance = _provenance(checkpoint)
+    provenance = _provenance(checkpoint, n=3)
     sink = EvaluationSink(tmp_path / "eval" / "heldout.jsonl")
 
     records = run_heldout_evaluation(
@@ -120,6 +147,7 @@ def test_sweep_evaluates_heldout_end_to_end_writing_to_sink_only(tmp_path: Path)
         attempt=_attempt(),
         sink=sink,
         guard=CostGuard(0, 1, 0),
+        taskspec_store=_STORE,
     )
 
     assert len(records) == 3
@@ -137,10 +165,11 @@ def test_cost_guard_halts_loudly_with_no_partial_record(tmp_path: Path) -> None:
         run_heldout_evaluation(
             checkpoint,
             _heldout_set(3),
-            _provenance(checkpoint, max_tasks=1),
+            _provenance(checkpoint, n=3, max_tasks=1),
             attempt=_attempt(),
             sink=sink,
             guard=CostGuard(1, 1, 0),
+            taskspec_store=_STORE,
         )
 
     written = sink.read_all()
@@ -157,10 +186,11 @@ def test_token_budget_halt_writes_no_record_for_the_halted_task(tmp_path: Path) 
         run_heldout_evaluation(
             checkpoint,
             _heldout_set(2),
-            _provenance(checkpoint, max_tokens=10),
+            _provenance(checkpoint, n=2, max_tokens=10),
             attempt=_attempt(),
             sink=sink,
             guard=CostGuard(0, 1, 10),
+            taskspec_store=_STORE,
         )
 
     assert sink.read_all() == ()  # nothing written
@@ -175,10 +205,11 @@ def test_nothing_is_written_to_the_experience_log(tmp_path: Path) -> None:
     run_heldout_evaluation(
         checkpoint,
         _heldout_set(2),
-        _provenance(checkpoint),
+        _provenance(checkpoint, n=2),
         attempt=_attempt(),
         sink=EvaluationSink(tmp_path / "eval.jsonl"),
         guard=CostGuard(0, 1, 0),
+        taskspec_store=_STORE,
     )
 
     assert not store.read_all()
@@ -193,10 +224,11 @@ def test_all_three_arms_run_through_the_identical_runner(tmp_path: Path) -> None
         records = run_heldout_evaluation(
             checkpoint,
             _heldout_set(2),
-            _provenance(checkpoint),
+            _provenance(checkpoint, n=2),
             attempt=_attempt(),
             sink=sink,
             guard=CostGuard(0, 1, 0),
+            taskspec_store=_STORE,
         )
         assert len(records) == 2
         assert all(r.arm == arm.value for r in records)
@@ -216,6 +248,7 @@ def test_mismatched_provenance_fails_loudly(tmp_path: Path) -> None:
         max_tasks=0,
         max_attempts_per_task=1,
         max_tokens=0,
+        verification_manifest_hash=_vm_hash(1),
     )
     with pytest.raises(EvaluationError):
         run_heldout_evaluation(
@@ -225,5 +258,6 @@ def test_mismatched_provenance_fails_loudly(tmp_path: Path) -> None:
             attempt=_attempt(),
             sink=sink,
             guard=CostGuard(0, 1, 0),
+            taskspec_store=_STORE,
         )
     assert sink.read_all() == ()  # refused before any write

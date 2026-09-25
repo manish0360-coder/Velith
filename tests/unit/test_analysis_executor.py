@@ -43,6 +43,7 @@ _A0_CHECKPOINT = _hex("a0-empty-checkpoint")
 def _prereg(checkpoint_count: int = 1, *, manifest: str = "manifest") -> PreRegistration:
     return PreRegistration.build(
         manifest_hash=_hex(manifest),
+        verification_manifest_hash=_hex("verification-manifest"),
         checkpoint_identities=tuple(_hex(f"cp{i}") for i in range(1, checkpoint_count + 1)),
         base_model="synthetic-base",
         eval_seed=7,
@@ -62,6 +63,7 @@ def _evaluation_identity(prereg: PreRegistration, checkpoint: str, arm: str) -> 
         max_tasks=prereg.max_tasks,
         max_attempts_per_task=prereg.max_attempts_per_task,
         max_tokens=prereg.max_tokens,
+        verification_manifest_hash=prereg.verification_manifest_hash,
     ).identity
 
 
@@ -150,6 +152,23 @@ def test_expected_identity_set_is_manifest_sensitive() -> None:
     other = expected_evaluation_identities(_prereg(2, manifest="other"), _A0_CHECKPOINT)
     # The manifest hash is an input to the digest, so it is verified cryptographically.
     assert first.isdisjoint(other)
+
+
+def test_expected_identity_set_is_verification_manifest_sensitive() -> None:
+    """Identity v2: the verification manifest hash is an input to every expected identity."""
+    base = _prereg(2)
+    other = _resealed(base, verification_manifest_hash=_hex("other-verification-manifest"))
+    first = expected_evaluation_identities(base, _A0_CHECKPOINT)
+    second = expected_evaluation_identities(other, _A0_CHECKPOINT)
+    assert first.isdisjoint(second)
+
+
+def test_preflight_rejects_a_v1_lineage_preregistration(tmp_path: Path) -> None:
+    """Mixed-version joins are rejected: an oed7 (v1) lineage cannot enter a v2 analysis."""
+    v1_lineage = _resealed(_prereg(), spec_version="m9-spec-frozen-oed7")
+    assert v1_lineage.verify_identity()  # internally consistent, still the wrong lineage
+    with pytest.raises(ExecutionError, match="identity-v2 lineage"):
+        _preflight(tmp_path, prereg=v1_lineage)
 
 
 # ---------------------------------------------------------------------------

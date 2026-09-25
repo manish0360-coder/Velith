@@ -53,6 +53,7 @@ def _hex(seed: str) -> str:
 def _prereg() -> PreRegistration:
     return PreRegistration.build(
         manifest_hash=_hex("manifest"),
+        verification_manifest_hash=_hex("verification-manifest"),
         checkpoint_identities=(_hex("cp1"), _hex("cp2")),
         base_model="synthetic-base",
         eval_seed=7,

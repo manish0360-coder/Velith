@@ -26,6 +26,7 @@ def _cid(seed: str) -> str:
 def _build(**overrides: object) -> PreRegistration:
     kwargs: dict[str, object] = {
         "manifest_hash": _cid("manifest"),
+        "verification_manifest_hash": _cid("verification-manifest"),
         "checkpoint_identities": (_cid("cp1"), _cid("cp2"), _cid("cp3")),
         "base_model": "qwen2.5-coder",
         "eval_seed": 0,
@@ -84,7 +85,7 @@ def test_non_concrete_manifest_hash_is_rejected() -> None:
 
 def test_required_plan_fields_are_frozen_values() -> None:
     pr = _build()
-    assert pr.spec_version == "m9-spec-frozen-oed7"
+    assert pr.spec_version == "m9-spec-frozen-oed7-vm2"
     assert pr.primary_endpoint == "binary_passed"
     assert pr.alpha == 0.01
     assert pr.statistic_identifier == prereg.STATISTIC_IDENTIFIER
@@ -164,3 +165,30 @@ def test_analysis_p1_does_not_import_heldout_surfaces() -> None:
         "GuardedEpisodeWriter",
     ):
         assert forbidden not in sources, f"P1 must not reference held-out surface: {forbidden}"
+
+
+# --- M9 VM2: verification-manifest binding (D29; docs/M9_SPEC.md Amendment VM2) -------
+
+
+def test_verification_manifest_hash_is_an_identity_component() -> None:
+    """A different verification manifest yields a new pre-registration identity (VM2)."""
+    base = _build()
+    other = _build(verification_manifest_hash=_cid("other-verification-manifest"))
+    assert base.verification_manifest_hash != other.verification_manifest_hash
+    assert base.identity != other.identity
+
+
+@pytest.mark.parametrize("bad", ["", "not-a-hash", "A" * 64, "a" * 63])
+def test_non_concrete_verification_manifest_hash_is_rejected(bad: str) -> None:
+    """A missing or malformed verification manifest hash fails validation (VM2)."""
+    with pytest.raises(ValidationError):
+        _build(verification_manifest_hash=bad)
+
+
+def test_v1_shaped_preregistration_cannot_be_loaded() -> None:
+    """A v1 payload (oed7 lineage, no verification manifest hash) is rejected (VM2)."""
+    payload = _build().model_dump()
+    payload.pop("verification_manifest_hash")
+    payload["spec_version"] = "m9-spec-frozen-oed7"
+    with pytest.raises(ValidationError):
+        prereg.PreRegistration.model_validate(payload)
