@@ -3,7 +3,7 @@
 **Project:** Velith
 **Document type:** Permanent engineering decision record. This is a *record*, not a discussion. Each entry states a decision that has already been ratified, its rationale, the alternatives that were rejected, and its consequences.
 **Status of this document:** Authoritative. A ratified decision is changed only by a new dated entry that explicitly supersedes the prior one, with justification. Decisions are never edited away silently.
-**Last updated:** 2026-07-06
+**Last updated:** 2026-09-26
 
 **Naming lineage (for the record):** This program was discussed during its review phase under the working names *PrometheusLite* / *Mini Prometheus* (program) and *Noetica* (system). The ratified flagship name is **Velith**. Where earlier internal documents (`VISION.md`, the architecture/cognitive/theory papers) use the older names, they refer to this same project unless explicitly stated otherwise.
 
@@ -52,6 +52,10 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D23 | M4 architecture frozen as written; Scientific-Review enhancements deferred (M4) | Accepted |
 | D24 | Future Principle A — engineering-task decomposition (InitialState/Context/Objective) | Accepted (future guidance — deferred) |
 | D25 | Future Principle B — held-out evolves toward distance-based exclusion | Accepted (future guidance — deferred) |
+| D26 | Real-task verification execution boundary; scoped supersession of D19 (M2-PV-R) | Accepted |
+| D27 | Real-task verdict source-of-truth; clarifies M0 §6 and D13 (M2-PV-R) | Accepted |
+| D28 | TaskSpec digest transport — Option D (M2-PV-R) | Accepted |
+| D29 | M8 evaluation identity v2 (supersedes M8 v1 evaluation identity; resolves CX-A1) | Accepted |
 
 ---
 
@@ -473,6 +477,178 @@ M1 verdict states are: `PASSED`, `FAILED`, `PATCH_APPLY_FAILED`, `NO_PATCH` (all
 **Alternatives rejected.** Implementing distance-based exclusion in M4 (premature; no continuous domain present; violates M4 domain-neutrality). Weakening the identity lock now (unnecessary and unsafe — it would trade an exact guarantee for an unvalidated heuristic).
 
 **Consequences.** When a continuous engineering domain enters the corpus (a D5 rung beyond software), the held-out lock is **extended** with a distance-based criterion via a new dated decision, preserving the exact identity-based path for discrete domains. The invariant both mechanisms must satisfy is D8's: held-out experience never leaks into any arm's memory. See [[D8]], [[D15]], [[D23]].
+
+---
+
+## D26 — Real-task verification execution boundary (scoped supersession of D19 for real repository tasks)
+
+**Status:** Accepted. **Date:** 2026-09-25. **(Ratified by the Research Director at M2-PV-R.)** **Supersedes:** D19, **only** for the verification of real repository-level tasks. D19 remains authoritative and unchanged for the legacy synthetic-fixture verifier (`VerifierSandbox`: two-phase `unshare -n` under `CAP_SYS_ADMIN`, single container), including `M2_SPEC.md:232` ("Single-container — no orchestrator/compose split"), which D26 scopes identically.
+
+**Evidence / flaw (amendment procedure, `DECISIONS.md:479`).**
+- Real tasks require task-specific interpreters, native libraries and dependency sets that cannot co-reside in the single Velith image.
+- The M2 feasibility prototype (`b14d918`, evidence manifest `30c59a45db9e06556bc0a0529b290d43c7a4163066b3b3a4c138f97eaa6255f7`) demonstrated, for one task and benign candidates only, sealed digest-pinned network-less execution in separate task containers driven by a host-side orchestrator.
+
+**Decision.**
+1. **Placement (AR-2):** trusted host verifier orchestrator → digest-pinned task container → candidate execution.
+2. **Before execution:** the image digest (`image@sha256:…`) and the declared platform are verified. On mismatch the orchestrator raises.
+3. **Fresh container per execution:** baseline, candidate, confirmation re-run and admission runs each use a new container from the pinned digest, removed unconditionally. No container is reused after candidate code executed in it.
+4. **Mandatory constraints:**
+   - `--network none`; `--cap-drop ALL`; `--security-opt no-new-privileges`;
+   - bounded memory (swap disabled), CPU, PID count and wall time;
+   - bounded disk and captured output where the runtime supports it.
+5. **Prohibited:** `--privileged`; any Docker socket or container-runtime access from a task container; Docker-in-Docker; host filesystem (bind) mounts. Inputs are copied into a created, not-started container; outputs are copied out only after full teardown.
+6. **No candidate access** to the trusted experience/episode store, evaluation sink, pre-registration, corpus, TaskSpec registry or evidence ledger. None of these exists inside any task container, nor in any namespace shared with one.
+7. **No install, build or network activity** during verification. The published image is the complete environment. D19's two-phase intent is preserved by construction: the proposer's network is outside every task container.
+8. **Fail closed:** if any required constraint cannot be applied and verified (runtime inspection of the created container), the orchestrator raises `SandboxExecutionError` and never executes candidate code under weaker isolation.
+9. **Classification (SRC-mandated amendment):** the host orchestrator **shall execute verdict classification only through the hash-locked verifier classifier environment specified by D27.**
+10. **Role of the host:** the host is the **process manager**. It is **not** the scientific source of candidate test-execution evidence; that evidence originates only inside task containers (D27 A).
+
+**Trust boundary.**
+- **Trusted:** the orchestrator and its D27 environment; the container runtime (stated assumption: root-equivalent host access); the TaskSpec registry; the evidence ledger; trusted runner artifacts; the task image as an environment after admission.
+- **Untrusted:** the candidate patch, and everything in a candidate or rerun container from the first execution of candidate code.
+- **Evidence:** untrusted-side evidence may lower a verdict. It may support `PASSED` only through the integrity checks the frozen M2-PV specification will define, and then only with the accepted E12/E13 residuals recorded in the M2-PV-R ratification record.
+
+**Alternatives rejected:**
+- AR-1, in-container execution: environment infeasibility, and co-location with the experience store.
+- AR-3, socket-mounted sibling containers: root-equivalent host control reachable from a container.
+- AR-4, Docker-in-Docker or privileged mode.
+
+Rootless and hardened runtimes (AR-5/AR-6) are deferred options, not rejected.
+
+**Consequences.**
+- `docker-compose.yml` and `docker/verifier.Dockerfile` are unchanged.
+- The legacy verifier is confined to synthetic fixtures.
+- CI exercises real-task verification only where a runtime and the images are available; elsewhere it capability-skips with an explicit reason, never a silent pass.
+
+**Not decided by D26:** runner mechanics; R_b, R_g, R_c; limit values; non-root, read-only-root and hardened runtime; protected-surface policy; TaskSpec schema (open questions of the M2-PV-R ratification record).
+
+---
+
+## D27 — Real-task verification: evidence, classification and orchestration (clarifies M0 §6 and D13's verifier sentence)
+
+**Status:** Accepted. **Date:** 2026-09-25. **(Ratified by the Research Director at M2-PV-R.)** **Clarifies, for real-task verification under D26 only:**
+- `M0_SPEC.md:120` ("…never as the source of truth for a verdict");
+- `PROJECT_STATE.md:127`;
+- `DECISIONS.md:263` (D13: "The deterministic verifier … runs inside a Linux container").
+
+None is edited. All three remain authoritative for the Velith image, CI gates and the legacy fixture verifier.
+
+**Decision.** A real-task verdict is produced by three strictly separated functions:
+- **A. Task execution evidence.** Produced **only** inside the admitted, digest-pinned task container, plus the container runtime's inspection of it. This is the sole empirical input about candidate behavior.
+- **B. Verdict classification.** Performed **only** by the trusted, hash-locked Velith verifier classifier: a deterministic mapping from trusted evidence + TaskSpec + frozen rules → `Verdict`.
+- **C. Host orchestration.** A process-management function only: create, constrain, feed, tear down and collect. It contributes no evidence and no judgment.
+
+**The classifier MUST:**
+1. run from a clean git tree at a recorded commit;
+2. run under the exact locked Python environment (D13 target 3.12; hash-locked dependencies);
+3. verify its own environment identity before classifying;
+4. refuse evaluation-of-record execution if required identity cannot be verified;
+5. use only explicit, recorded inputs;
+6. prohibit ambient host state (host packages, environment variables, user configuration, working directory, locale or time zone) from affecting classification;
+7. record classifier identity (commit, lock hash, interpreter version) in the evidence of every verification;
+8. deterministically map trusted evidence + TaskSpec + frozen rules to a `Verdict`.
+
+**Source of truth.** The scientific source of truth is **A interpreted by B**. The host is **not** the scientific source of truth.
+
+**Determinism.** **Cross-machine deterministic classification is a mandatory acceptance requirement to be demonstrated by the M2-PV validation matrix.** It is an acceptance requirement. It has **not** yet been demonstrated: M2 showed one-host reproducibility for one task only.
+
+**Consequences.** Classifier identity becomes part of verification provenance. Whether it also enters evaluation identity remains open (M2-PV-R ratification record, OQ-9).
+
+---
+
+## D28 — TaskSpec digest transport (handle-carried, registry-resolved)
+
+**Status:** Accepted. **Date:** 2026-09-25. **(Ratified by the Research Director at M2-PV-R, subject to D-1 to D-4.)**
+
+**Decision.**
+- Transport chain: `CorpusTask.handle` → content-addressed TaskSpec registry → TaskSpec digest → real-task adapter (registered behind the frozen M5 `TaskAdapter` seam) → `Task`.
+- The digest is recomputed at the registry read, at the adapter and at the verifier. Any mismatch is fail-closed.
+- Grounded in frozen semantics: "a *verification handle* owned by the verifier" (`M4_SPEC.md:34`); the adapter turns "a `CorpusTask`'s opaque handle into the concrete inputs the frozen proposer and verifier consume" (`M5_SPEC.md:56-57`); `repo_path` + `hidden_test_command` are the `Task`'s verification handle (`batch/adapter.py:8`).
+
+**Mandatory conditions.**
+- **D-1:** `Task.task_id` remains spec-independent and stable. Re-pinning a TaskSpec never changes `task_id`.
+- **D-2:** `Task.prompt` is a pure function of `material`. TaskSpec test data, hidden tests, gold patches and protected-surface details must never enter `material` or `prompt`.
+- **D-3:** a static wiring guard prevents real-task `Task` instances from reaching the legacy `VerifierSandbox`. Real-task `Task` instances use only the production container verifier/orchestrator.
+- **D-4:** the `Task.repo_path` interpretation is formally documented as follows.
+
+**Interpretation note — D-4, proposed wording for the future M2-PV specification:**
+"For real-task verification, `Task.repo_path` is the path of the verified, content-addressed TaskSpec bundle, i.e. *the source bundle copied by the verifier* (`task.py:50`: 'the source the verifier copies — it never operates on this path in place'). It is not a git working copy. The legacy fixture interpretation is unchanged."
+
+**Invariants:**
+- Option D does **not** modify `CorpusTask.material`, does **not** alter task identity (`manifest.py:39-46`), and does **not** modify retrieval semantics.
+- Retrieval inputs are exactly `CorpusTask.material` (`evaluation/attempt.py:125`) and `episode.prompt` (`retrieval/retriever.py:27`). Neither is touched.
+- The TaskSpec used at evaluation **excludes the gold patch**, which exists only in admission evidence.
+
+---
+
+## D29 — M8 evaluation identity v2 (supersedes M8 v1 evaluation identity; resolves CX-A1)
+
+**Status:** Accepted. **Date:** 2026-09-26. **Supersedes:** the M8 v1 evaluation identity (M8_SPEC §3.5; `EvaluationProvenance`), **for evaluations created after the v2 freeze only**. M8 v1 is not edited and remains the immutable historical specification. **Resolves:** CX-A1 (M8 declared immutable, yet the ratified VerificationManifest binding requires a changed evaluation identity). **Builds on:** D8, D18, D26, D27, D28.
+
+**Evidence / flaw justifying the change (amendment procedure).**
+- Evaluations conducted under different verification contracts (TaskSpecs: e.g. different image digests, required tests or protected-surface inputs) are different measurements.
+- Under M8 v1 they receive the **same** evaluation identity: v1 identity covers the checkpoint, the corpus partition manifest, arm, base model, evaluation seed and cost guard, but no verification component (`src/velith/evaluation/provenance.py`).
+- M8_SPEC declares itself immutable ("Once frozen it is immutable"). The change is therefore made by **versioned supersession**, not by editing M8 v1.
+- M8 v1 status: `docs/M8_SPEC.md` as committed at `49d9f75` ("docs: add frozen M8 specification…"), certified at `m8-complete` (`fe2b3d7`). The file's "Status: DRAFT" header is a stale label contradicted by that governance record. The header is not edited by this decision (see Consequences).
+
+**Decision.**
+
+1. **VerificationManifest.**
+   - Definition: the canonical mapping `task_identity → TaskSpec digest` over the **held-out evaluation population only** (the tasks of the `HeldOutEvaluationSet` under evaluation).
+   - Hash: `verification_manifest_hash` = SHA-256 of its canonical serialization. This reuses the repository's existing canonical rule (`json.dumps(sort_keys=True, ensure_ascii=False, separators=(",", ":"))`, UTF-8, lowercase hex), with no new format.
+   - Construction **rejects**, raising `VerificationManifestError` (for use by the M8 runner check): an empty population; any duplicate task identity (whether its digests are equal or differ); a missing TaskSpec; an invalid digest (not 64 lowercase hex); and TaskSpec content that does not re-hash to its digest.
+2. **M8 evaluation identity v2.**
+   - The hashed `EvaluationProvenance` payload gains exactly two keys:
+     - `identity_version = "m8-evaluation-identity-v2"`;
+     - `verification_manifest_hash`.
+   - The eight v1 components are unchanged in name and meaning: `checkpoint_identity`, `manifest_hash`, `arm`, `base_model`, `eval_seed`, `max_tasks`, `max_attempts_per_task`, `max_tokens`.
+   - The v2 payload therefore has exactly ten keys: `identity_version`, `checkpoint_identity`, `manifest_hash`, `arm`, `base_model`, `eval_seed`, `max_tasks`, `max_attempts_per_task`, `max_tokens`, `verification_manifest_hash`.
+   - `manifest_hash` keeps its name and its meaning (the full-corpus partition manifest hash). It is distinct from `verification_manifest_hash`, and the two are not interchangeable.
+3. **M9 binding.**
+   - `PreRegistration` gains `verification_manifest_hash` and carries `spec_version = "m9-spec-frozen-oed7-vm2"`. This is the existing M9 version concept, bumped; no new global version system is introduced.
+   - A pre-registration with that `spec_version` binds only to identity-v2 evaluations.
+4. **Coordinated migration.** M8 identity v2, the M9 pre-registration amendment and the M10 reconstruction amendment form **one identity migration**: specified, frozen and implemented together. M10 rebuilds the evaluation identity from pre-registration fields at two sites (`analysis/binder.py`, `analysis/executor.py`); both must reconstruct identity v2.
+5. **Mixed-version joins are rejected:**
+   - v1 pre-registration with v2 code or records;
+   - v2 pre-registration with v1 records;
+   - v2 with v2 under a different VerificationManifest.
+6. **Consistency check.** Before any attempt, the M8 runner requires:
+   - `identity_version == "m8-evaluation-identity-v2"`;
+   - `verification_manifest_hash` equal to the hash computed from the evaluated held-out set.
+
+   Any mismatch, missing or changed TaskSpec, missing or extra task, or duplicate identity halts with no record written.
+7. **Fixtures (universal v2).** There is one v2 identity path for all evaluations, including synthetic fixtures. Fixture corpora supply deterministic synthetic 64-hex digest handles (a test-data change only). No dual v1/v2 code path exists.
+8. **Classifier identity** (D27: commit, lock hash, interpreter) enters **neither** `PreRegistration.identity` nor `EvaluationProvenance.identity`. It is recorded in verification evidence. One evaluation of record (every arm and checkpoint under one pre-registration) runs under one classifier identity, enforced through the evidence ledger.
+9. **Available-task TaskSpec lineage** is **deferred** as an M2-PV provenance concern and is **not solved** by this decision. The VerificationManifest binds held-out TaskSpecs only. Available-task verification affects evaluation only through memory content, which `checkpoint_identity` binds. A TaskSpec change that leaves every memory episode byte-identical is not reflected in any identity.
+10. **No statistical change.**
+    - M9 statistical formulas and decision rules are unchanged: outcome encoding (PASSED = 1, else 0), complete-case handling, global-incomplete VOID, OED-7 empty-dataset VOID, GEE, EMM, Wald inference, McNemar (K = 1), Holm correction, α = 0.01, the decision rule, and A0 time-invariance (OED-2).
+    - This decision changes identity and version plumbing, not statistical inference.
+
+**Rationale.**
+- Binding the verification contract into evaluation identity ensures that differently verified evaluations cannot share an identity and so cannot be joined or pooled. This holds except with negligible probability under the standard SHA-256 collision-resistance assumption.
+- Versioned supersession honors M8's immutability.
+- Held-out-only scope matches exactly the population M8 evaluates, without widening M8's read surface into the available partition.
+- Excluding classifier identity keeps pre-registration sealable before execution.
+
+**Alternatives rejected:**
+- A procedural-only verification manifest outside identity (rejected by RD and SRC at M2-PV-R).
+- In-place editing of M8 v1 (violates M8 immutability).
+- The full-corpus population (widens M8 into the available partition; conservative but unnecessary for held-out identity).
+- Actually-evaluated tasks as the population (not pre-registrable).
+- Dual v1/v2 code support, or fixtures kept on v1 (a permanent second path, or tests exercising an identity no longer used).
+- Classifier identity inside evaluation identity (breaks pre-run sealing).
+- A plaintext `verification_manifest_hash` in `AnalysisProvenance` (redundant: covered by the pre-registration and evaluation identities).
+
+**Consequences.**
+- **M8 v1** (`docs/M8_SPEC.md`, code at `b14d918` / `m8-complete`) remains historically reproducible. Its identities are never edited, rehashed or converted.
+- **No migration.** No real M8 evaluation, M9 pre-registration or M10 analysis artifact exists in the repository (verified at `b14d918`), so there is no migration procedure, no rehashing and no v1→v2 conversion. Every evaluation of record created after the v2 freeze uses identity v2.
+- **`EvaluationRecord` is unchanged:** `evaluation_identity` carries the binding by hash inclusion.
+- **`AnalysisProvenance` is unchanged:** no plaintext `verification_manifest_hash`.
+- **Checkpoint identity and the corpus manifest are unchanged.**
+- **The stale "DRAFT" header** of `docs/M8_SPEC.md` is **not** corrected by this decision. It may be corrected only by a separate, explicitly authorized documentation task.
+- **Successor texts:** the M8 identity v2 specification (`docs/M8_IDENTITY_V2_SPEC.md`) and the M9 Amendment VM2 block in `docs/M9_SPEC.md` (`m9-spec-frozen-oed7-vm2`) are the normative texts of this decision. Proposed freeze tags: `m8-identity-v2-frozen`, `m9-spec-frozen-oed7-vm2` (created only at the separately authorized repository gate).
+- **Acceptance cases.** The 18 identity cases of the successor specification are **specification-level** cases. They become implementation acceptance tests. None has been implementation-validated.
+- **Implementation** requires its own handoff and authorization. This decision authorizes none.
 
 ---
 
