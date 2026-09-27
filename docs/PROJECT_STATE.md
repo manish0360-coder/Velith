@@ -3,8 +3,9 @@
 **Project:** Velith
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
-**Last updated:** 2026-07-06
-**Current tag:** `m8-complete`
+**Last updated:** 2026-09-28
+**Current tag:** `m9-complete` (at `a218bca`). Evaluation identity v2 (D29) is implemented after it, at
+`5476d82`.
 **Branch:** `main` — green end to end, pushed.
 
 ---
@@ -109,6 +110,30 @@ preserved (D8) and, independently, the guarded boundary still fail-closes. Each 
 content-addressed identity binding results to one checkpoint and split; the sweep is cost-guarded and
 halts loudly with no partial record. M8 **computes no statistic and reaches no decision** (D22; those are
 M9/M10). This was *composition, not a rewrite* — no M0–M7 contract was modified.
+
+**M9 — complete** (`m9-complete`, `a218bca`). The experiment is **pre-registered**: a frozen,
+content-addressed record fixes the arms, the held-out split, the checkpoint schedule and the analysis
+plan before any comparative statistic is computed (`docs/M9_SPEC.md`, frozen `m9-spec-frozen`, re-frozen
+after amendments OED-2, OED-7 and VM2). The statistical analysis layer (`src/velith/analysis/`) is
+implemented and verified.
+
+**Evaluation identity v2 — implemented** (`5476d82`, D29; `docs/M8_IDENTITY_V2_SPEC.md`).
+`EvaluationProvenance` v2 binds `identity_version` and a `verification_manifest_hash`. The runner checks the
+held-out `VerificationManifest` before any attempt and fails closed. TaskSpecs are held in a
+schema-agnostic, content-addressed byte store. All 18 specification-level identity cases are
+implementation tests, and the M9 statistics modules are byte-identical. Gate at `5476d82`: `ruff`,
+`ruff format`, `mypy --strict` (132 files) and pytest (741 passed) inside the verifier image, and GitHub
+CI green (run 36350073168).
+
+**M10 — in progress** (D12: Stage-1 statistics and go/no-go). The held-out analysis execution
+orchestrator exists (`e04d7f9`) and is exercised on synthetic fixtures only. **No real M8 evaluation, M9
+pre-registration or M10 analysis artifact exists** (D29), so there is no go/no-go verdict.
+
+**Governance (D30, 2026-09-28).** The ecosystem Handbook v1.1 governs Velith as Layer 3. The M1–M9 generic
+machinery is frozen as historical research infrastructure and is not migrated. New engineering code
+consumes Noetica through a published package. Velith does not yet produce physical-engineering results or
+expose the `EngineeringTask` / `EngineeringResult` / `DesignArtifact` API, and is not yet published as a
+package.
 
 ## 2. M1 objectives and achievements
 

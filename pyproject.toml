@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "velith"
 version = "0.0.0"
-description = "Velith — a grounded, verification-first engineering intelligence (M0 skeleton)."
+description = "Velith — a grounded, verification-first engineering-intelligence research harness (software vertical; M0–M9)."
 readme = "README.md"
 requires-python = "==3.12.*"
 license = { text = "Proprietary" }

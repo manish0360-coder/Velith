@@ -1,14 +1,21 @@
 # Velith
 
-Project skeleton and environment validation. M0 proves the full toolchain runs
-end-to-end on the verified environment — Docker build, containerized pytest,
-configuration load, structured logging, and CI green from a fresh clone —
-**before any agent, model, dataset, or verification logic exists**. The sanity
-check inside the container is a placeholder whose only job is to prove the pipe
-is connected.
+Velith is a grounded, verification-first engineering-intelligence **research harness**. It is
+Layer 3 of the MiniFlyWire → Noetica → Velith → Mini Prometheus ecosystem (`docs/DECISIONS.md`
+D30). Its first engineering vertical is repository-level software (D4): a local model proposes a
+patch, a hardened containerized verifier disposes of it against hidden tests, and the outcome is
+persisted as a content-hashed episode.
 
-> This README documents how to *run and reproduce* M0. The project's *why* and
-> *how* live in their own documents (`docs/VISION.md`, `docs/DECISIONS.md`).
+**Status:** M0–M9 are complete (`m9-complete`) and evaluation identity v2 (D29) is implemented. M10
+(Stage-1 statistics and go/no-go, D12) is in progress: its execution orchestrator exists and runs
+on synthetic fixtures only. No real evaluation and no go/no-go verdict exist yet. Velith does not
+yet produce physical-engineering results, does not yet expose the `EngineeringTask` /
+`EngineeringResult` / `DesignArtifact` API, and is not yet published as a package (version
+`0.0.0`). Details: [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md).
+
+> This README documents how to *run and reproduce* the containerized toolchain, first established in
+> M0. The project's *why* and *how* live in their own documents (`docs/VISION.md`,
+> `docs/DECISIONS.md`).
 
 ## Prerequisites
 

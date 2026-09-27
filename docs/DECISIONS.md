@@ -3,7 +3,7 @@
 **Project:** Velith
 **Document type:** Permanent engineering decision record. This is a *record*, not a discussion. Each entry states a decision that has already been ratified, its rationale, the alternatives that were rejected, and its consequences.
 **Status of this document:** Authoritative. A ratified decision is changed only by a new dated entry that explicitly supersedes the prior one, with justification. Decisions are never edited away silently.
-**Last updated:** 2026-09-26
+**Last updated:** 2026-09-28
 
 **Naming lineage (for the record):** This program was discussed during its review phase under the working names *PrometheusLite* / *Mini Prometheus* (program) and *Noetica* (system). The ratified flagship name is **Velith**. Where earlier internal documents (`VISION.md`, the architecture/cognitive/theory papers) use the older names, they refer to this same project unless explicitly stated otherwise.
 
@@ -56,6 +56,7 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D27 | Real-task verdict source-of-truth; clarifies M0 §6 and D13 (M2-PV-R) | Accepted |
 | D28 | TaskSpec digest transport — Option D (M2-PV-R) | Accepted |
 | D29 | M8 evaluation identity v2 (supersedes M8 v1 evaluation identity; resolves CX-A1) | Accepted |
+| D30 | Ecosystem Handbook v1.1 adopted as Velith's Layer-3 governance; M1–M9 frozen as historical research infrastructure | Accepted |
 
 ---
 
@@ -649,6 +650,29 @@ None is edited. All three remain authoritative for the Velith image, CI gates an
 - **Successor texts:** the M8 identity v2 specification (`docs/M8_IDENTITY_V2_SPEC.md`) and the M9 Amendment VM2 block in `docs/M9_SPEC.md` (`m9-spec-frozen-oed7-vm2`) are the normative texts of this decision. Proposed freeze tags: `m8-identity-v2-frozen`, `m9-spec-frozen-oed7-vm2` (created only at the separately authorized repository gate).
 - **Acceptance cases.** The 18 identity cases of the successor specification are **specification-level** cases. They become implementation acceptance tests. None has been implementation-validated.
 - **Implementation** requires its own handoff and authorization. This decision authorizes none.
+
+---
+
+## D30 — Ecosystem Handbook v1.1 adopted as Velith's Layer-3 governance; M1–M9 frozen as historical research infrastructure
+
+**Status:** Accepted. **Date:** 2026-09-28. **Authority:** Director ruling of 2026-09-28 (I1 — four-repository architecture alignment). **Supersedes:** nothing. D1–D29 remain in force exactly as written.
+
+**Decision.**
+1. *The Engineering Constitution and Architecture Handbook* v1.1 — ecosystem MiniFlyWire → Noetica → Velith → Mini Prometheus; held byte-identical in Noetica (`docs/constitution/HANDBOOK_v1.1.md`) and Mini Prometheus (`constitution/HANDBOOK_v1.1.md`); SHA-256 `ad670d24eaab6acb2cca301223dfb58d9216b6ee89e87fd569638af3a00eafd0` — governs Velith as **Layer 3, engineering intelligence**: engineering ontology and content, engineering reasoning, CAD/simulation, engineering verification, and verified engineering results published through the public API `EngineeringTask` / `EngineeringResult` / `DesignArtifact`. That API does not exist yet.
+2. The generic machinery built in M1–M9 — episode store and index, provenance records, retrieval memory and write-filter arms, held-out lock and frozen evaluation, batch cost guard, and the analysis layer — is **frozen as historical research infrastructure and evidence**. It is **not migrated** to Noetica now. Its identities (including D29 identity v2), specifications and results stay exactly as they are.
+3. **New engineering code consumes Noetica's platform mechanisms** (for example the `Verifier` protocol and `Provenance`) through a pinned, published package, and adds no new generic platform mechanism to Velith.
+4. Velith imports neither MiniFlyWire nor Mini Prometheus.
+
+**Rationale.** The Handbook is ratified in Noetica (DN-1) and Mini Prometheus (CAP-0001) but was never recorded here, so the ecosystem had two architectures. Noetica's platform mechanisms were built by extraction from Velith (Noetica N.3). Velith's M1–M9 copies therefore predate them, and migrating them would reopen frozen identities and evidence for no capability gain.
+
+**Alternatives rejected.** Migrating the M1–M9 machinery to Noetica now: it disturbs frozen evidence, and Noetica is not yet a published package. Leaving Velith outside the Handbook: two contradictory architectures in one ecosystem.
+
+**Consequences.**
+- D4 (first vertical: repository-level software), **D5** (migration ladder: software → electronics/PCB → HDL/firmware → mechanical/FEA → manufacturing) and **D12** (M0–M10 roadmap; M10 = Stage-1 statistics and go/no-go) remain in force.
+- **Open question for the Director — recorded, not decided here.** The ecosystem integration plan proposes a first physical engineering result for one machined part. Under D5 mechanical is the fourth rung, attempted after the software loop's go/no-go (D12, M10) and the electronics and HDL rungs. Adopting that plan requires a separate, explicitly authorized decision that names D5 and D12 and supersedes them under the amendment procedure. This decision does not.
+- **Naming.** In the current ecosystem, "Noetica" and "Mini Prometheus" name separate repositories (Layers 2 and 4). The naming-lineage note at the head of this record refers only to historical working names for Velith.
+- Consuming Noetica is gated on Noetica publishing a package.
+- The stale status documents (README introduction, `pyproject.toml` description, `docs/PROJECT_STATE.md`) are corrected by the same I1 task. Nothing else changes.
 
 ---
 
