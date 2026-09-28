@@ -57,6 +57,7 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D28 | TaskSpec digest transport — Option D (M2-PV-R) | Accepted |
 | D29 | M8 evaluation identity v2 (supersedes M8 v1 evaluation identity; resolves CX-A1) | Accepted |
 | D30 | Ecosystem Handbook v1.1 adopted as Velith's Layer-3 governance; M1–M9 frozen as historical research infrastructure | Accepted |
+| D31 | R-1 resolution: Stage-1 go/no-go realigned to D8.5 through a versioned M9/M10 Stage-1 successor | Accepted |
 
 ---
 
@@ -673,6 +674,97 @@ None is edited. All three remain authoritative for the Velith image, CI gates an
 - **Naming.** In the current ecosystem, "Noetica" and "Mini Prometheus" name separate repositories (Layers 2 and 4). The naming-lineage note at the head of this record refers only to historical working names for Velith.
 - Consuming Noetica is gated on Noetica publishing a package.
 - The stale status documents (README introduction, `pyproject.toml` description, `docs/PROJECT_STATE.md`) are corrected by the same I1 task. Nothing else changes.
+
+---
+
+## D31 — R-1 resolution: Stage-1 go/no-go realigned to D8.5 through a versioned M9/M10 Stage-1 successor
+
+**Status:** Accepted. **Date:** 2026-09-28. **Authority:** Director ruling on the R-1
+governance adjudication and the Scientific Review Council rulings (SRC reviews 1 and 2);
+ratified by the Research Director on 2026-09-28 (D31 R1).
+**Supersedes (scoped, named):**
+- D29 item 3 — only the literal `spec_version` value, for pre-registrations created under the
+  Stage-1 successor. All other D29 provisions remain in force.
+- D30 item 2 — only insofar as it would bar a versioned successor of the analysis layer. Historical
+  versions remain frozen and reproducible.
+- D12 — only the operational assignment of the "Stage-1 orchestrator + full A0/A2 run" to the
+  then-existing M9/M10 machinery, insofar as the Stage-1 run must now be executed and analyzed
+  under the ratified Stage-1 successor. D12's wording is not edited. All its other obligations
+  remain in force.
+**Does not supersede:** D6, D7, D8 (text unchanged), D15, D26–D28, M8 identity v2, or any other
+provision of D12.
+
+**Evidence / flaw (amendment procedure).**
+- D8.5 defines Stage 1 as A0 vs A2, a cheap go/no-go. D12 assigns Stage-1 statistics and the
+  go/no-go to M10.
+- Frozen M9 (VM2) and the M10 executor decide GO by A1 > A0 ∧ A2 > A1, and compute no A2-vs-A0
+  statistic. No record superseded D8.5 (R-1 adjudication).
+- The SRC ruled the frozen rule non-equivalent to D6 H1, with a false-NO-GO failure mode, and
+  ruled that the minimum effect size and seed count required by D8.2 are unoperationalized.
+- D12 assigned the "Stage-1 orchestrator + full A0/A2 run" to M9 as then operationalized. That
+  operationalization is the one R-1 found inconsistent with D8.5, and M9 closed (`m9-complete`)
+  without the run. The operational assignment therefore cannot stand unamended.
+
+**Decision.**
+1. D6, D7 and D8 remain in force with their text unchanged.
+2. The M9 VM2 go/no-go rule is not the Stage-1 go/no-go. No evaluation of record is analyzed
+   under it for the Stage-1 decision. R-1 is resolved.
+3. A versioned M9/M10 Stage-1 successor (specification and analysis layer) is authorized to be
+   specified and frozen through the full pipeline. This decision authorizes no implementation.
+4. Frozen M9 (all tags), `docs/M9_SPEC.md`, the analysis code at its tags and their identities
+   stay exactly as they are and remain reproducible. Nothing is converted or rehashed.
+5. The successor analysis layer completes the D12 M10 experiment in Velith. It is not a new
+   generic platform mechanism under D30.3.
+6. Stage 1:
+   - primary estimand Δ20 = P(A2 pass at final checkpoint K) − P(A0 pass), a paired
+     contrast over held-out tasks;
+   - H0: Δ20 ≤ δ vs H1: Δ20 > δ, with δ > 0;
+   - the test is an exact unconditional paired-proportion test at one-sided α = 0.01, applied
+     at checkpoint K for every K;
+   - Wald is excluded;
+   - GEE is used only for a secondary, non-gating longitudinal trend.
+   GO iff H0 is rejected; NO-GO otherwise. A Stage-1 GO is necessary-but-not-sufficient (D8.5).
+7. Evaluations of record use proposer temperature T = 0.0 and one evaluation seed (N = 1).
+   The held-out task is the unit. Uncertainty is task-level, and D8.6's seed-spread is
+   inapplicable under these conditions. Any other temperature requires a new decision.
+8. δ is not selected by this decision. δ is a response-scale absolute pass-rate difference that
+   represents a practically meaningful improvement, and is recorded with justification by the
+   Research Director after the pilot base rate is obtained.
+9. δ, usable held-out n, K, N, α and target power (≥ 0.80) are specified jointly and frozen in the
+   successor pre-registration before any confirmatory evaluation of record. If power is below
+   0.80 at the maximum usable n, the confirmatory Stage-1 design is VOID before execution — never
+   NO-GO. The frozen VOID dispositions (global-incomplete; n = 0; empty VerificationManifest) are
+   retained.
+10. Pilot information may inform design only, and never enters confirmatory inference, memory or
+    evaluation records. Pilot tasks are excluded from the confirmatory held-out population by a
+    frozen, content-addressed exclusion registry.
+11. If A1 is collected concurrently, the Stage-1 analysis reads no A1 outcome, and no A1 outcome
+    is disclosed before the Stage-2 analysis plan is fixed. Stage-2 timing, hypotheses and
+    multiplicity are not decided here; D15 governs, and D12 governs outside the scoped
+    supersession in item 12.
+12. Scoped supersession of D12 (operational assignment only): the Stage-1 run that D12 assigned
+    to M9, as then operationalized, is executed and analyzed under the ratified Stage-1 successor, as
+    the confirmatory Stage-1 evaluation of record. D12's wording is not edited. Its other
+    obligations remain in force. `m9-complete` remains the tag of the pre-registration layer as
+    delivered.
+13. M8 identity v2 is used unchanged.
+
+**Rationale.** It realigns the go/no-go to the ratified D8.5 without rewriting D6, D7 or D8. It
+removes a false-NO-GO dependency on A1. It tests the D6 contrast against the zero-experience agent
+directly. It uses exact inference at small n. It prevents an underpowered study from producing an
+uninterpretable NO-GO. It preserves the historical record.
+
+**Alternatives rejected.**
+- Option 1 (a supersession ratifying the frozen three-arm rule): it encodes the A1 > A0 dependency.
+- Interpretation A for the primary estimand: it extrapolates A0 along A2's slope, contrary to D6.
+- The asymptotic Wald gate: Type-I inflation at small n.
+- Multiple sampling seeds at T = 0: degenerate replicates, no information.
+- Choosing δ before the base rate is known: statistically blind.
+
+**Consequences.**
+- A successor specification, SRC delta review, RD freeze and implementation handoff are
+  required, each separately authorized.
+- The open decisions listed in the D31 governance draft remain open.
 
 ---
 
