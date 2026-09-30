@@ -15,6 +15,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
 from velith.analysis import gee as gee_mod
@@ -64,7 +65,12 @@ def _obs(task: str, arm: str, index: int | None, endpoint: int) -> Observation:
 
 
 def _a1_vs_a0(k: int = 3, n_tasks: int = 24) -> list[Observation]:
-    """A1-vs-A0 fixture: one A0 row per task (OED-2) plus A1 across the K checkpoints."""
+    """A1-vs-A0 fixture: one A0 row per task (OED-2) plus A1 across the K checkpoints.
+
+    Singular-boundary fixture (CI #113 / SRC ruling): every checkpoint has the same A1 pass
+    count, so the true checkpoint effect is exactly zero and the robust covariance is singular
+    to machine precision. Design and structural-halt tests use it; fit-success tests do not.
+    """
     observations: list[Observation] = []
     for t in range(n_tasks):
         observations.append(_obs(_task(t), Arm.A0.value, None, 1 if t % 4 == 0 else 0))
@@ -72,6 +78,22 @@ def _a1_vs_a0(k: int = 3, n_tasks: int = 24) -> list[Observation]:
             observations.append(
                 _obs(_task(t), Arm.A1.value, index, 0 if (t + index) % 3 == 0 else 1)
             )
+    return observations
+
+
+def _a1_vs_a0_trend(k: int = 3, n_tasks: int = 24) -> list[Observation]:
+    """Well-conditioned A1-vs-A0 fixture with a real, non-zero checkpoint effect.
+
+    A0 is unchanged; A1 passes a task iff ``t % 6 < index + 2``, so the A1 pass rate rises
+    across the schedule (1/2, 2/3, 5/6 at K=3). The robust covariance is far from singular
+    (smallest eigenvalue ~5e-2), so the fit result does not depend on the host's BLAS/SIMD
+    rounding (CI #113 / SRC acceptance criterion 1).
+    """
+    observations: list[Observation] = []
+    for t in range(n_tasks):
+        observations.append(_obs(_task(t), Arm.A0.value, None, 1 if t % 4 == 0 else 0))
+        for index in range(1, k + 1):
+            observations.append(_obs(_task(t), Arm.A1.value, index, 1 if t % 6 < index + 2 else 0))
     return observations
 
 
@@ -194,9 +216,19 @@ def test_groups_are_contiguous_codes_in_sorted_task_order() -> None:
 
 
 def test_a1_vs_a0_fit_succeeds_with_the_frozen_configuration() -> None:
-    result = fit_gee(_a1_vs_a0(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
+    result = fit_gee(_a1_vs_a0_trend(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
     assert isinstance(result, GeeFit)
     assert result.converged is True
+    # The fixture is well-conditioned by construction: a real checkpoint effect and a robust
+    # covariance far from singular, so this outcome is hardware-independent (CI #113).
+    assert abs(result.params[1]) > 0.5
+    # Smallest eigenvalue > 1e-3  <=>  (V - 1e-3 * I) is positive definite (Cholesky succeeds;
+    # a LinAlgError fails the test). Same call pattern as the frozen classify_failure.
+    shifted = [
+        [value - (1e-3 if i == j else 0.0) for j, value in enumerate(row)]
+        for i, row in enumerate(result.cov_robust)
+    ]
+    np.linalg.cholesky(np.asarray(shifted, dtype=np.float64))
     assert result.design_columns == DESIGN_COLUMNS[Comparison.A1_VS_A0]
     assert len(result.params) == 3  # [b0, b_checkpoint, b_arm] -- 3-D (handoff §6)
     assert len(result.cov_robust) == 3
@@ -215,7 +247,7 @@ def test_a2_vs_a1_fit_yields_the_four_dimensional_coefficient_vector() -> None:
 
 
 def test_provenance_records_the_frozen_model_and_solver_configuration() -> None:
-    result = fit_gee(_a1_vs_a0(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
+    result = fit_gee(_a1_vs_a0_trend(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
     assert isinstance(result, GeeFit)
     provenance = result.provenance
     assert provenance.family == "Binomial"
@@ -242,8 +274,8 @@ def test_binomial_default_link_is_logit_in_the_pinned_statsmodels() -> None:
 
 
 def test_repeated_execution_is_bitwise_identical() -> None:
-    first = fit_gee(_a1_vs_a0(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
-    second = fit_gee(_a1_vs_a0(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
+    first = fit_gee(_a1_vs_a0_trend(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
+    second = fit_gee(_a1_vs_a0_trend(), comparison=Comparison.A1_VS_A0, checkpoint_count=3)
     assert isinstance(first, GeeFit) and isinstance(second, GeeFit)
     assert first.params == second.params
     assert first.cov_robust == second.cov_robust
@@ -251,7 +283,7 @@ def test_repeated_execution_is_bitwise_identical() -> None:
 
 
 def test_input_order_does_not_change_the_result() -> None:
-    observations = _a1_vs_a0()
+    observations = _a1_vs_a0_trend()
     shuffled = list(reversed(observations))
     ordered_fit = fit_gee(observations, comparison=Comparison.A1_VS_A0, checkpoint_count=3)
     shuffled_fit = fit_gee(shuffled, comparison=Comparison.A1_VS_A0, checkpoint_count=3)
@@ -259,6 +291,31 @@ def test_input_order_does_not_change_the_result() -> None:
     # Row order perturbs the solver at machine precision, so the adapter fixes it.
     assert ordered_fit.params == shuffled_fit.params
     assert ordered_fit.cov_robust == shuffled_fit.cov_robust
+
+
+def test_singular_boundary_outcome_is_documented_as_hardware_dependent() -> None:
+    """Permanent singular-boundary coverage (CI #113, SRC acceptance criteria 2-3).
+
+    The true checkpoint effect of ``_a1_vs_a0()`` is exactly zero, so its robust covariance
+    is singular to machine precision. The frozen parameter-free Cholesky rule then returns
+    GeeFit or SINGULAR_ROBUST_COVARIANCE depending on the host's BLAS/SIMD rounding (observed:
+    Haswell kernels fit, AVX-512/SkylakeX kernels fail). Both are accepted here. This test
+    documents the unresolved cross-machine variance; it does not change production semantics
+    and does not demonstrate D27 cross-machine determinism.
+    """
+    observations = _a1_vs_a0()
+    # The zero effect is a property of the data, independent of any numerical routine.
+    a1_passes = [
+        sum(o.endpoint for o in observations if o.arm == Arm.A1.value and o.checkpoint_index == k)
+        for k in (1, 2, 3)
+    ]
+    assert len(set(a1_passes)) == 1
+
+    result = fit_gee(observations, comparison=Comparison.A1_VS_A0, checkpoint_count=3)
+    if isinstance(result, GeeFit):
+        assert result.params[1] == pytest.approx(0.0, abs=1e-12)
+    else:
+        assert result.reason is GeeFailureReason.SINGULAR_ROBUST_COVARIANCE
 
 
 # ---------------------------------------------------------------------------

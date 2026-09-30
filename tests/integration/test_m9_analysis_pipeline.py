@@ -353,17 +353,35 @@ def _kgt1_rule(task_index: int, arm: str, checkpoint_index: int | None) -> bool:
     return (task_index + 2 * position) % 5 != 0
 
 
+def _kgt1_trend_rule(task_index: int, arm: str, checkpoint_index: int | None) -> bool:
+    """Like ``_kgt1_rule`` but A1 has a real checkpoint trend (CI #113 / SRC criterion 1).
+
+    Under ``_kgt1_rule`` every checkpoint has the same A1 pass count, so the A1-vs-A0 checkpoint
+    effect is exactly zero and its robust covariance is singular to machine precision; whether
+    that fits then depends on the host's BLAS/SIMD rounding. Here A1 passes iff
+    ``task_index % 6 < position + 2`` (pass rate 1/2, 2/3, 5/6 at K=3): well-conditioned.
+    """
+    if arm == Arm.A1.value:
+        position = 0 if checkpoint_index is None else checkpoint_index
+        return task_index % 6 < position + 2
+    return _kgt1_rule(task_index, arm, checkpoint_index)
+
+
 #: The task count C8's in-container-verified GEE fixtures use with this same rule at K=3.
 #: A smaller design does not fit, and then no GeeFit exists to record provenance from.
 _KGT1_TASKS = 24
 
 
 def _run_kgt1(
-    *, task_count: int = _KGT1_TASKS, checkpoint_count: int = 3, manifest: str = "manifest"
+    *,
+    task_count: int = _KGT1_TASKS,
+    checkpoint_count: int = 3,
+    manifest: str = "manifest",
+    rule: PassedRule = _kgt1_rule,
 ) -> tuple[DecisionResult, AnalysisResultRecord, HolmResult]:
     prereg = _prereg(checkpoint_count, manifest=manifest)
     tasks = _tasks(task_count)
-    records = _records(prereg, tasks, _kgt1_rule)
+    records = _records(prereg, tasks, rule)
     observations, completeness = _bind(prereg, tasks, records)
     holm, provenance, checkpoint_values = _kgt1_holm(
         _included(observations, completeness), checkpoint_count
@@ -404,15 +422,16 @@ def test_kgt1_complete_path_composes_the_four_test_family() -> None:
 
 def test_kgt1_records_the_gee_solver_provenance() -> None:
     # Provenance can only come from a GeeFit, so assert the fixture actually fits first:
-    # a failure here points at the design, not at the C12 provenance contract.
+    # a failure here points at the design, not at the C12 provenance contract. The trend
+    # rule keeps both fits well-conditioned on every host (CI #113).
     prereg = _prereg(3)
     tasks = _tasks(_KGT1_TASKS)
-    observations, completeness = _bind(prereg, tasks, _records(prereg, tasks, _kgt1_rule))
+    observations, completeness = _bind(prereg, tasks, _records(prereg, tasks, _kgt1_trend_rule))
     included = _included(observations, completeness)
     assert isinstance(_fit_comparison(included, Comparison.A1_VS_A0, 3), GeeFit)
     assert isinstance(_fit_comparison(included, Comparison.A2_VS_A1, 3), GeeFit)
 
-    _, record, _ = _run_kgt1()
+    _, record, _ = _run_kgt1(rule=_kgt1_trend_rule)
     provenance = record.provenance
     assert provenance.statistical_library == "statsmodels"
     assert provenance.statistical_library_version is not None
