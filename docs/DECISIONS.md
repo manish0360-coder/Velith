@@ -3,7 +3,7 @@
 **Project:** Velith
 **Document type:** Permanent engineering decision record. This is a *record*, not a discussion. Each entry states a decision that has already been ratified, its rationale, the alternatives that were rejected, and its consequences.
 **Status of this document:** Authoritative. A ratified decision is changed only by a new dated entry that explicitly supersedes the prior one, with justification. Decisions are never edited away silently.
-**Last updated:** 2026-09-28
+**Last updated:** 2026-10-11
 
 **Naming lineage (for the record):** This program was discussed during its review phase under the working names *PrometheusLite* / *Mini Prometheus* (program) and *Noetica* (system). The ratified flagship name is **Velith**. Where earlier internal documents (`VISION.md`, the architecture/cognitive/theory papers) use the older names, they refer to this same project unless explicitly stated otherwise.
 
@@ -765,6 +765,70 @@ uninterpretable NO-GO. It preserves the historical record.
 - A successor specification, SRC delta review, RD freeze and implementation handoff are
   required, each separately authorized.
 - The open decisions listed in the D31 governance draft remain open.
+
+---
+
+## D32 — F-1: proposer patch extraction preserves counted blank context lines (scoped correction of the frozen proposer)
+
+**Status:** Accepted. **Date:** 2026-10-11. **Authority:** Research Director approval of 2026-10-11
+("Approve F-1 — with strict scope limits"). **Supersedes (scoped, named):** the "proposer unchanged"
+freeze recorded across M2–M10 (`docs/M2_SPEC.md`, `docs/M3_SPEC.md`, `docs/PROJECT_STATE.md`,
+`docs/M8_SPEC.md`) and D30 item 2, only for the body of `_extract_patch` in
+`src/velith/agent/proposer.py`. **Does not supersede:** D29 / M8 identity v2 (no identity field
+changes), D31 (including item 7, T = 0.0), the proposer prompt, the client, the model settings,
+or any other frozen component.
+
+**Evidence / flaw (amendment procedure).**
+- `_extract_patch` applied `.strip()` to the extracted block (and to an unfenced completion).
+  That deletes a trailing whitespace-only line. In a unified diff, a single-space line is a
+  blank *context* line. Deleting it leaves the final hunk one line short of its own `@@` header,
+  and `git apply` rejects a correct patch as "corrupt patch".
+- Velith-research pilot evidence (commit `7b5118a`, `p3/P3_REPORT.md` §4–§5,
+  `p3/checks/audit_p3.py`):
+  - three recorded generations were false negatives: P2-11 (U arm), P3-01 and P3-10;
+  - re-run on the frozen verification gate with the un-stripped diff, P3-01 passes 15/15 required
+    tests and P3-10 passes 10/10, so the defect converted verified fixes into recorded failures.
+- P1-T1 was also altered by `.strip()`, but its deleted line lies beyond its hunk's count. It is
+  not an F-1 case: its patch fails because the model omitted four import lines of the source.
+- A Stage-1 experience log built on the defective extractor would record correct fixes as
+  failures, corrupting the quantity Stage 1 measures. No Stage-1 evaluation of record exists
+  yet, so correcting it now invalidates no record.
+
+**Decision.**
+1. `_extract_patch` trims surrounding whitespace exactly as before, with one exception. Trailing
+   whitespace-only lines that the final hunk's own header still counts are kept, byte-for-byte.
+2. Nothing is added, reordered, rewritten or "repaired". The rule reads only the final hunk
+   header and the lines the model emitted. A malformed header, surplus trailing lines, or the
+   absence of any hunk leaves the former `.strip()` result unchanged.
+3. Regression tests (`tests/unit/test_proposer.py`, fixtures `tests/fixtures/f1_extract/`) pin:
+   - the three real false negatives, which must now apply and must still fail under the former
+     logic;
+   - P1-T1 as an unchanged guard case;
+   - equivalence with the former logic on every other input class.
+4. Frozen research evidence (P1, P2, P3) is not rescored or edited. Diagnostic outcomes stay
+   diagnostic.
+5. The verifier image is not rebuilt by this decision. Images built before this commit (for
+   example `velith-verifier:m0`, which the P2/P3 PILOT_SETs pin) keep the former extractor. A
+   future pilot that needs the corrected extractor builds and pins a new image under its own
+   authorization.
+
+**Rationale.** It is the smallest change that stops the extractor from deleting diff content. The
+other 28 of the 31 recorded pilot generations extract byte-identically before and after. The
+module's "minimal extraction, no repair heuristics" principle is kept: the change removes a
+deletion; it does not add an inference.
+
+**Alternatives rejected.**
+- Keeping all trailing whitespace-only lines: it would turn surplus padding (for example, an
+  indented closing fence) into spurious context lines and create new failures.
+- `git apply --recount` or fuzzy application in the verifier: verifier-side repair, outside this
+  scope, and it would mask model errors that must stay measurable.
+- Leaving the defect frozen: Stage-1 memory would learn from systematically mislabeled outcomes.
+
+**Consequences.**
+- The pinned SHA-256 of `src/velith/agent/proposer.py` changes. Research pins of the former value
+  (`91d32296…`) remain valid for the frozen pilots only.
+- Proposals extracted before and after this commit differ only for completions whose final hunk
+  ends in a counted blank context line.
 
 ---
 

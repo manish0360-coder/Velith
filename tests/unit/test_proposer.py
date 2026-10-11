@@ -5,17 +5,29 @@ reusable transport-mocking scaffolding (``_StubTransport``) and pins the thin
 ``OllamaClient`` adapter contract against it; C6 adds the proposer's tests here using
 the same scaffolding. No test in this file touches a real Ollama — CI stays hermetic
 (M1 spec §14).
+
+D32 / F-1 adds the patch-extraction regression tests at the end of this file: the
+former ``strip()`` deleted a trailing blank context line, so ``git apply`` rejected
+correct patches (pilot evidence: P2-11 U arm, P3-01, P3-10; P1-T1 is a guard case).
 """
 
 from __future__ import annotations
 
+import json
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from velith.agent.proposer import Proposal, ProposerAgent
+from velith.agent.proposer import (
+    Proposal,
+    ProposerAgent,
+    _extract_patch,
+    _final_hunk_shortfall,
+    _hunk_counts,
+)
 from velith.llm.client import Completion, ModelUnavailableError, OllamaClient
 from velith.task import Task
 
@@ -148,3 +160,113 @@ def test_propose_propagates_model_unavailable_rather_than_no_patch() -> None:
     proposer = ProposerAgent(client=OllamaClient(host="http://stub", transport=boom), model="m")
     with pytest.raises(ModelUnavailableError):
         proposer.propose(_TASK, seed=0)
+
+
+# --- D32 / F-1: patch extraction keeps counted blank context lines ---------------
+
+_CASES_FILE = Path(__file__).resolve().parents[1] / "fixtures" / "f1_extract" / "cases.json"
+_CASES: dict[str, dict[str, Any]] = {
+    c["case"]: c for c in json.loads(_CASES_FILE.read_text(encoding="utf-8"))["cases"]
+}
+_FENCE_TAGS = frozenset({"diff", "patch", "udiff", "python"})
+
+
+def _former_extract(text: str) -> str:
+    """The pre-D32 extraction, verbatim, kept as the behavioural reference."""
+    if "```" in text:
+        start = text.find("```") + 3
+        end = text.find("```", start)
+        if end != -1:
+            lines = text[start:end].splitlines()
+            if lines and lines[0].strip().lower() in _FENCE_TAGS:
+                lines = lines[1:]
+            candidate = "\n".join(lines).strip()
+            if candidate:
+                return candidate + "\n"
+    stripped = text.strip()
+    if stripped.startswith(("diff --git", "--- ", "@@")):
+        return stripped + "\n"
+    return ""
+
+
+def _git_apply_check(tmp_path: Path, rel: str, content: str, patch: str) -> bool:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+    result = subprocess.run(
+        ["git", "-C", str(tmp_path), "apply", "--check", "-"],
+        input=patch.encode("utf-8"),
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+@pytest.mark.parametrize("case", ["P2-11-U", "P3-01", "P3-10"])
+def test_real_false_negatives_now_apply(case: str, tmp_path: Path) -> None:
+    c = _CASES[case]
+    fixed = _extract_patch(c["completion"])
+    former = _former_extract(c["completion"])
+    assert fixed == former + " \n"  # exactly one line restored: the blank context line
+    assert _git_apply_check(tmp_path / "fixed", c["path"], c["source_window"], fixed)
+    assert not _git_apply_check(tmp_path / "former", c["path"], c["source_window"], former)
+
+
+def test_p1_t1_surplus_blank_line_is_still_dropped(tmp_path: Path) -> None:
+    c = _CASES["P1-T1"]
+    out = _extract_patch(c["completion"])
+    assert out == _former_extract(c["completion"])
+    assert not out.endswith("\n \n")
+    # It still does not apply, for a reason unrelated to F-1: the model's context
+    # omits four import lines that the source file contains.
+    assert not _git_apply_check(tmp_path, c["path"], c["source_window"], out)
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("@@ -1,5 +1,5 @@", (5, 5)),
+        ("@@ -349,11 +349,13 @@ def write(self, table):", (11, 13)),
+        ("@@ -1 +1 @@", (1, 1)),
+        ("@@ -0,0 +1,2 @@", (0, 2)),
+        ("@@ -1,x +1,2 @@", None),
+        ("@@ -x +y @@", None),
+        ("@@ garbage", None),
+    ],
+)
+def test_hunk_counts(header: str, expected: tuple[int, int] | None) -> None:
+    assert _hunk_counts(header) == expected
+
+
+def test_shortfall_counts_context_minus_plus_and_ignores_no_newline_marker() -> None:
+    lines = ["--- a/m.py", "+++ b/m.py", "@@ -1,3 +1,3 @@", " a", "-b", "+B", "\\ No newline"]
+    assert _final_hunk_shortfall(lines) == 1
+    assert _final_hunk_shortfall([*lines, " c"]) == 0
+    assert _final_hunk_shortfall(["no hunk here"]) == 0
+
+
+_SYNTHETIC = [
+    # blank context line at the end of the final hunk: restored
+    ("```diff\n--- a/m.py\n+++ b/m.py\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n \n```", True),
+    # surplus whitespace beyond the hunk's count: still stripped
+    ("```diff\n--- a/m.py\n+++ b/m.py\n@@ -1,2 +1,2 @@\n a\n-b\n+B\n \n \n```", False),
+    # malformed header (non-numeric ranges): former behaviour
+    ("```diff\n--- a/m.py\n+++ b/m.py\n@@ -x +y @@\n a\n \n```", False),
+    # unfenced raw diff with a counted blank context line: restored
+    ("--- a/m.py\n+++ b/m.py\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n \n", True),
+    # leading whitespace and trailing spaces on the last content line: former behaviour
+    ("```\n\n  --- a/m.py\n+++ b/m.py\n@@ -1,2 +1,2 @@\n a\n-b\n+B   \n\n```", False),
+    # no patch at all
+    ("I cannot produce a diff.", False),
+    ("```python\nprint('hi')\n```", False),
+]
+
+
+@pytest.mark.parametrize(("text", "restored"), _SYNTHETIC)
+def test_only_counted_blank_context_lines_change_behaviour(text: str, restored: bool) -> None:
+    former = _former_extract(text)
+    if restored:
+        assert _extract_patch(text) == former + " \n"
+    else:
+        assert _extract_patch(text) == former

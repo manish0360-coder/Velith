@@ -66,6 +66,60 @@ class Proposal(BaseModel):
         return bool(self.patch.strip())
 
 
+def _hunk_counts(header: str) -> tuple[int, int] | None:
+    """(old, new) line counts of a ``@@ -a[,b] +c[,d] @@`` header, or None if malformed."""
+    parts = header.split(" ")
+    if len(parts) < 4 or parts[3] != "@@" or parts[1][:1] != "-" or parts[2][:1] != "+":
+        return None
+    old_start, _, old_count = parts[1][1:].partition(",")
+    new_start, _, new_count = parts[2][1:].partition(",")
+    counts = (old_count or "1", new_count or "1")
+    if not all(s.isdigit() for s in (old_start, new_start, *counts)):
+        return None
+    return int(counts[0]), int(counts[1])
+
+
+def _final_hunk_shortfall(lines: list[str]) -> int:
+    """Context lines the last hunk's own header still expects after ``lines`` end."""
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].startswith("@@"):
+            counts = _hunk_counts(lines[i])
+            if counts is None:
+                return 0
+            old_left, new_left = counts
+            for line in lines[i + 1 :]:
+                if line.startswith("\\"):
+                    continue
+                if line.startswith("-"):
+                    old_left -= 1
+                elif line.startswith("+"):
+                    new_left -= 1
+                else:
+                    old_left -= 1
+                    new_left -= 1
+            return max(0, min(old_left, new_left))
+    return 0
+
+
+def _trim(text: str) -> str:
+    """Trim surrounding whitespace without deleting diff content (D32 / F-1).
+
+    Identical to ``text.strip()`` unless the final hunk's own header still counts lines
+    that ``strip()`` would delete. Those trailing whitespace-only lines are kept,
+    because a single-space line is how a unified diff encodes a blank context line; it
+    is not padding. Nothing is added, reordered or rewritten: the kept lines are the
+    model's own bytes.
+    """
+    lines = text.lstrip().splitlines()
+    tail: list[str] = []
+    while lines and not lines[-1].strip():
+        tail.insert(0, lines.pop())
+    keep = _final_hunk_shortfall(lines)
+    if keep == 0 or not tail:
+        return text.strip()
+    return "\n".join(lines + tail[:keep])
+
+
 def _extract_patch(text: str) -> str:
     """Minimally extract a diff-shaped patch from a completion, or '' if none."""
     if _FENCE in text:
@@ -75,10 +129,10 @@ def _extract_patch(text: str) -> str:
             lines = text[start:end].splitlines()
             if lines and lines[0].strip().lower() in _FENCE_LANGUAGE_TAGS:
                 lines = lines[1:]
-            candidate = "\n".join(lines).strip()
+            candidate = _trim("\n".join(lines))
             if candidate:
                 return candidate + "\n"
-    stripped = text.strip()
+    stripped = _trim(text)
     if stripped.startswith(_DIFF_PREFIXES):
         return stripped + "\n"
     return ""
