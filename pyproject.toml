@@ -13,6 +13,9 @@ authors = [{ name = "Velith" }]
 dependencies = [
     "pydantic==2.9.2",
     "pydantic-settings==2.5.2",
+    # Engineering API v0 (D33, API-0 C1): Noetica consumed as the pinned, published release
+    # (D30 item 3). Tag v1.0.0 = commit 44d380bdcadf50fec463c2840bc5d181d7e7e0f7.
+    "noetica @ git+https://github.com/manish0360-coder/Noetica-agent-lab@v1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +35,10 @@ analysis = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/velith"]
+
+# Required for the git-tag pin of noetica above (a PEP 508 direct reference).
+[tool.hatch.metadata]
+allow-direct-references = true
 
 # ----------------------------------------------------------------------------
 # Ruff: single source of truth for lint AND format (M0 §7).

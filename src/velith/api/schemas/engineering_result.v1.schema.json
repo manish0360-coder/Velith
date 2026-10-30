@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EngineeringResult",
+  "description": "Velith Engineering API v0 wire contract (D33; docs/API_V0_SPEC.md). Owned by Velith. Exactly five fields, constraint-equivalent to Mini Prometheus' consumed stub. Identity: content_hash = 'sha256:' + SHA-256 of the canonical JSON of the identity view (this object without result_id and content_hash, plus identity_version 'velith-engineering-result-identity-v1'); result_id = uuid5(924036ea-946e-57d4-9a75-e94278f979aa, content_hash). The hash detects accidental change only: it gives no authenticity, no non-repudiation and no proof that verification occurred.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result_id", "content_hash", "verified", "verifier", "design_artifact"],
+  "properties": {
+    "result_id": { "$ref": "#/$defs/Uuid" },
+    "content_hash": { "$ref": "#/$defs/ContentHash" },
+    "verified": { "const": true },
+    "verifier": { "$ref": "#/$defs/ProducedBy" },
+    "design_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["media_type", "ref", "content_hash"],
+      "properties": {
+        "media_type": { "type": "string", "minLength": 1 },
+        "ref": { "$ref": "#/$defs/Uuid" },
+        "content_hash": { "$ref": "#/$defs/ContentHash" }
+      }
+    }
+  },
+  "$defs": {
+    "Uuid": { "type": "string", "format": "uuid" },
+    "ContentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "SemVer": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$" },
+    "ProducedBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "#/$defs/SemVer" }
+      }
+    }
+  }
+}
