@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.4"]  # pinned build backend: deterministic package metadata (API-0 C3)
 build-backend = "hatchling.build"
 
 [project]
 name = "velith"
-version = "0.0.0"
+dynamic = ["version"]  # single source of truth: velith.__version__ (src/velith/__init__.py)
 description = "Velith — a grounded, verification-first engineering-intelligence research harness (software vertical; M0–M9)."
 readme = "README.md"
 requires-python = "==3.12.*"
@@ -39,6 +39,10 @@ packages = ["src/velith"]
 # Required for the git-tag pin of noetica above (a PEP 508 direct reference).
 [tool.hatch.metadata]
 allow-direct-references = true
+
+# The version is read from the package, never from a git tag (API-0 C3).
+[tool.hatch.version]
+path = "src/velith/__init__.py"
 
 # ----------------------------------------------------------------------------
 # Ruff: single source of truth for lint AND format (M0 §7).

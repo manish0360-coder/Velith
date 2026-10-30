@@ -304,3 +304,57 @@ C0 docs (this file, D33) · C1 contract core · C2 `SweVerifier` adapter (sandbo
   `attributes = {velith_version, duration_seconds}`.
 - **Import boundary.** `velith.api` stays contract-only and does not re-export `swe`; importing it
   loads neither `velith.harness` nor `velith.core.config` (`tests/unit/test_api_swe.py`).
+
+### C3 — packaging and the installed-wheel release gate
+
+- **Version.** `velith.__version__` is `"0.1.0"` and is the single version source: `pyproject.toml`
+  declares `dynamic = ["version"]` with `[tool.hatch.version] path = "src/velith/__init__.py"`. The
+  version is read from the file, never from a git tag, so the wheel builds without `v0.1.0`
+  existing. The build backend is pinned (`hatchling==1.32.4`). No `v0.1.0` tag is created at C3.
+- **Typing.** `src/velith/py.typed` (PEP 561) ships in the wheel.
+- **Consequences of the version change (not behavior-neutral).** `__version__` is read at runtime in
+  exactly three places; records created **after** the change differ from those created before:
+  - `runner/spike.py`: new spike episodes record `velith_version = "0.1.0"`. That field is inside the
+    episode hash boundary by design (`episodes/episode.py` `HASH_BOUNDARY_FIELDS`; M1 spec §9.1), so
+    a newly recorded episode starts a new `content_hash` lineage: the same proposal re-verified
+    under 0.1.0 hashes differently from one recorded under 0.0.0. D16.1 reproducibility holds within
+    a version. Existing episodes are unaffected: they verify against their own stored field.
+  - `analysis/result_record.py`: new M9/M10 result records carry `implementation_version = "0.1.0"`
+    inside their identity. No real result record exists (D29), so nothing on record changes.
+  - `api/swe.py`: `verifier.version` and provenance become `"0.1.0"`, so a real run can now
+    reproduce T4-B (checked by the C4 demo). No API result has been persisted.
+
+  Unchanged: the batch runner's `velith_version` is supplied by its caller; no test reads a fixed
+  package version (the episode fixtures pass explicit literals; `test_analysis_result_record.py`
+  and `test_api_swe.py` compare against `__version__` dynamically); no frozen statistics module and
+  no research pin (`Velith-research/p2/PILOT_SET.json` pins `proposer.py`, `batch/provenance.py`,
+  `llm/client.py`, `task.py`) changes. No existing record is rewritten or migrated.
+- **Release gate** `tools/verify_installed_wheel.py` (manual, not in CI; run in the verifier
+  container with `tools/` mounted read-only). Fail-closed: build, venv and installation failures
+  abort; every other check passes or fails; nothing is skipped and nothing falls back to the source
+  checkout. It proves:
+  - **A. Wheel** `velith-0.1.0-py3-none-any.whl`: only `velith/` and its dist-info; contract,
+    adapter, schema and `py.typed` present; no tests, fixtures or bytecode; METADATA `Version 0.1.0`,
+    `Requires-Python ==3.12.*`, runtime dependencies exactly pydantic, pydantic-settings and the
+    Noetica `v1.0.0` tag; no machine paths or credentials.
+  - **B. Isolation.** A fresh virtual environment without system site-packages; before
+    installation neither `velith` nor `noetica` is importable (negative control). Probes run as
+    `python -I` from an empty directory without `PYTHONPATH`; every loaded `velith` module must
+    resolve under the venv's site-packages, and no repository path or foreign site-packages may be
+    on `sys.path`.
+  - **C. Dependencies.** Installed with `pip install --isolated --no-cache-dir` and the repository
+    constraints. Noetica must be `1.0.0` **and** its PEP 610 `direct_url.json` must name
+    `https://github.com/manish0360-coder/Noetica-agent-lab`, `vcs = git`,
+    `requested_revision = v1.0.0` and `commit_id = 44d380bdcadf50fec463c2840bc5d181d7e7e0f7`; any
+    missing or mismatched field fails. pydantic 2.9.2 and pydantic-settings 2.5.2; statsmodels is
+    absent. `direct_url.json` is the installer's provenance record, not a cryptographic
+    attestation of the installed files.
+  - **D. Contract boundary.** A fresh process imports `velith.api` only and must load none of
+    `velith.harness`, `velith.api.swe`, `velith.core.config`, `velith.analysis`, `statsmodels`,
+    `mini_prometheus`, `miniflywire`; the installed `velith.api` sources pass an import scan.
+  - **E. Adapter packaging.** A separate fresh process imports `velith.api.swe` (harness
+    dependencies allowed) from the wheel; `SweVerifier` is a class. It is never instantiated and no
+    fixture is used (K4: fixtures are not packaged).
+  - **F. Vectors.** `tests/unit/test_api_vectors.py` alone, against the installed wheel (a generated
+    conftest asserts `velith` is imported from the venv): exactly 5 passed; any skipped, xfailed,
+    errored, failed or missing test fails the gate.
