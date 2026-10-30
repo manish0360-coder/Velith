@@ -3,7 +3,7 @@
 **Project:** Velith
 **Document type:** Permanent engineering decision record. This is a *record*, not a discussion. Each entry states a decision that has already been ratified, its rationale, the alternatives that were rejected, and its consequences.
 **Status of this document:** Authoritative. A ratified decision is changed only by a new dated entry that explicitly supersedes the prior one, with justification. Decisions are never edited away silently.
-**Last updated:** 2026-10-11
+**Last updated:** 2026-10-30
 
 **Naming lineage (for the record):** This program was discussed during its review phase under the working names *PrometheusLite* / *Mini Prometheus* (program) and *Noetica* (system). The ratified flagship name is **Velith**. Where earlier internal documents (`VISION.md`, the architecture/cognitive/theory papers) use the older names, they refer to this same project unless explicitly stated otherwise.
 
@@ -58,6 +58,7 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D29 | M8 evaluation identity v2 (supersedes M8 v1 evaluation identity; resolves CX-A1) | Accepted |
 | D30 | Ecosystem Handbook v1.1 adopted as Velith's Layer-3 governance; M1–M9 frozen as historical research infrastructure | Accepted |
 | D31 | R-1 resolution: Stage-1 go/no-go realigned to D8.5 through a versioned M9/M10 Stage-1 successor | Accepted |
+| D33 | Engineering API v0 (API-0): software-only Layer-3 public contract | Accepted |
 
 ---
 
@@ -829,6 +830,57 @@ deletion; it does not add an inference.
   (`91d32296…`) remain valid for the frozen pilots only.
 - Proposals extracted before and after this commit differ only for completions whose final hunk
   ends in a counted blank context line.
+
+---
+
+## D33 — Engineering API v0 (API-0): software-only Layer-3 public contract
+
+**Status:** Accepted. **Date:** 2026-10-30. **Authority:** Research Director ratification of the
+Engineering API v0 specification r4 and of Option 1 (content identity), 2026-10-30.
+**Supersedes:** nothing. **Does not supersede:** D4, D5, D12, D29 (identity v2), D30, D31, D32,
+or any frozen M1–M9 component. **Normative text:** `docs/API_V0_SPEC.md`.
+
+**Decision.**
+1. Velith publishes the Engineering API v0 named by D30 item 1 (`EngineeringTask`,
+   `EngineeringResult`, `DesignArtifact`) as milestone **API-0**, outside the M-sequence, for the
+   **software domain only**.
+2. The `EngineeringResult` wire object is exactly the five fields of Mini Prometheus' consumed stub
+   (`result_id`, `content_hash`, `verified`, `verifier`, `design_artifact`). Verification evidence
+   and provenance stay off the wire and are kept in local records.
+3. Identity is Option B: the wire object minus `{result_id, content_hash}`, plus
+   `identity_version = "velith-engineering-result-identity-v1"`, hashed as canonical JSON with
+   SHA-256 (`sha256:` prefix) through Noetica's `canonical_sha256`;
+   `result_id = uuid5(NS_VELITH_API, content_hash)` with
+   `NS_VELITH_API = 924036ea-946e-57d4-9a75-e94278f979aa`; media type
+   `application/vnd.velith.swe-patch+json`. Test vectors T1–T5b are normative.
+4. `result_id` identifies the deterministic content claim and its artifact, not a verification run;
+   separate runs may share it while keeping distinct local records.
+5. The public verification rule is PASSED, not flaky over at least two reruns,
+   `secondary_passed is True`, and network isolation on — deliberately stricter than the frozen M7
+   `is_verified_success`, which is unchanged.
+6. The hash detects accidental change only. It provides no authenticity, no non-repudiation and no
+   proof that verification occurred.
+7. Velith keeps `requires-python = "==3.12.*"`. Version `0.1.0` and tag `v0.1.0` are applied at C3;
+   distribution is by git tag only.
+8. The v0 demo is software-only and calls no manufacturing pipeline. A Mini Prometheus media-type
+   guard is mandatory before RM6 integration.
+
+**Rationale.** Mini Prometheus RM6 is blocked on a consumable Velith release exposing this API
+(CAP-0001 Field 8). This is the smallest contract that lets Layer 4 consume a real, grounded Layer-3
+result without changing Mini Prometheus' frozen contracts, while keeping the claim honest: a
+software verification is never presented as engineering verification of a physical part.
+
+**Alternatives rejected.** Evidence-committing identity (Option A): the consumer could not recompute
+it, and under the strict rule the evidence is nearly constant. Expanding the wire object: it changes
+a frozen consumer contract. Reusing the M7 rule: it admits results whose held-out secondary never
+ran (Law 16). A physical first result: closed by D5/D12/D31 (D30 open question).
+
+**Consequences.**
+- New code under `src/velith/api/` only; Noetica 1.0.0 becomes a pinned runtime dependency.
+- SFG remains **DEFERRED, NOT VERIFIED**; M10 has no valid go/no-go; physical and manufacturing
+  claims stay closed.
+- Implementation-time gates: repository reachability for the git-tag pins; Mini Prometheus Python
+  3.12 compatibility (with its goldens re-verified) before RM6.
 
 ---
 
