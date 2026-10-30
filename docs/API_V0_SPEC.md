@@ -261,7 +261,9 @@ C0 docs (this file, D33) · C1 contract core · C2 `SweVerifier` adapter (sandbo
 
 ---
 
-## 8. C1 implementation notes (no contract change)
+## 8. Implementation notes (no contract change)
+
+### C1 — contract core
 
 - `result_from_verification(task, artifact, evidence, *, verifier, provenance)` takes
   `VerificationEvidence`. C2 adds the adapter from a `VerifierSandbox` verdict to evidence; the
@@ -272,3 +274,33 @@ C0 docs (this file, D33) · C1 contract core · C2 `SweVerifier` adapter (sandbo
   stub. Velith has no JSON Schema validator dependency; the schema is checked structurally against
   the code constants (`tests/unit/test_api_contract.py`), and validated with a real validator on
   the Mini Prometheus side (V2, RM6).
+
+### C2 — `SweVerifier` adapter (`src/velith/api/swe.py`)
+
+- **K1 (ratified).** `VerifierSandbox` keeps its isolation flag and rerun count private, and its
+  `Verdict` does not record them. `SweVerifier` therefore constructs the sandbox itself and passes
+  both values explicitly through the sandbox's public constructor; the evidence reports exactly
+  those values. Omitted values are resolved once from `Settings` (`verifier_timeout_seconds`,
+  `verifier_network_isolation`, `flake_rerun_count`), the timeout exactly as the frozen spike
+  resolves it; explicitly supplied values are kept. A rerun count below 1 is refused. With
+  isolation on, the sandbox either runs every test command under `unshare -n` or raises; it never
+  runs them unisolated. No private attribute is read and no frozen M2 file is modified.
+- **K2 (ratified).** `SandboxExecutionError` propagates (D16.7). An infrastructure fault produces no
+  `EngineeringResult`, no `UnverifiedOutcome` and no record. `VERDICT_NOT_PASSED` therefore covers
+  only grounded verdicts (`FAILED`, `PATCH_APPLY_FAILED`; `NO_PATCH` is unreachable in v0 because
+  `SwePatch.text` is non-empty).
+- **Task resolution (K4).** `resolve_task` accepts only `software/calc_add_bug` and resolves the
+  fixture under `tests/fixtures` relative to the working directory (or an injected
+  `fixtures_root`). `SweVerifier` is therefore usable only where the fixtures exist — the
+  repository or the verifier container — and not from an installed wheel alone.
+- **Version (K5).** Until C3, `verifier.version` is `velith.__version__ = "0.0.0"`, so a real run
+  cannot reproduce T4-B; the integration tests pin the T3 artifact hash and content-identity
+  determinism instead.
+- **Protocol.** `SweVerifier.verify(task, candidate)` implements Noetica's `Verifier` protocol and
+  returns a Noetica `Verdict` with `confidence = 1.0` (exact software oracle) and `flaky`,
+  `flake_rerun_count`, `secondary_passed` and `network_isolated` in `detail` (Law 16).
+- **Provenance (local only).** `source = "velith-swe-verifier"`,
+  `transform = "velith.harness.VerifierSandbox.verify"`, `inputs = (task_id, artifact content hash)`,
+  `attributes = {velith_version, duration_seconds}`.
+- **Import boundary.** `velith.api` stays contract-only and does not re-export `swe`; importing it
+  loads neither `velith.harness` nor `velith.core.config` (`tests/unit/test_api_swe.py`).
