@@ -215,8 +215,9 @@ evidence audit by Mini Prometheus.
 A dedicated git-ignored directory `data/api_v0/`, separate from `src/`, `tests/`, `docs/` and frozen
 evidence including `data/episodes/`. One record per run (wire object + `task_id` + evidence +
 provenance), named `<result_id>__<run-utc>.json`, written once and never overwritten. Compose mounts
-only `./data/episodes`, so the demo runs with `-v ./data/api_v0:/app/data/api_v0`. The `.gitignore`
-entry is added in C4 (today only `/data/episodes/` is ignored [PROVEN]).
+only `./data/episodes`, so the demo runs with `-v ./data/api_v0:/app/data/api_v0`. The `/data/api_v0/` directory is listed in `.gitignore`, keeping generated local result records out of version control.
+
+The `<run-utc>` filename component uses UTC format `YYYYmmddTHHMMSSffffffZ`, including six fractional-second digits. Failed verification outcomes, including wrong and malformed patches, return `UnverifiedOutcome` and do not create result records. The `provenance.attributes.duration_seconds` value is run-dependent and may differ across executions; this does not change the deterministic wire object or its `result_id` when the content claim is unchanged.
 
 ### 6.3 Governance
 
