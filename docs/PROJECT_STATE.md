@@ -3,10 +3,10 @@
 **Project:** Velith
 **Document type:** Living status record. Captures the repository's *verified* state at each
 milestone boundary. Updated at milestone close, never improvised mid-implementation.
-**Last updated:** 2026-09-28
+**Last updated:** 2026-10-31 (API-0 close-out; previous update 2026-09-28)
 **Current tag:** `m9-complete` (at `a218bca`). Evaluation identity v2 (D29) is implemented after it, at
-`5476d82`.
-**Branch:** `main` — green end to end, pushed.
+`5476d82`. API-0 is complete at `6f64d66`; **no `v0.1.0` release tag exists**.
+**Branch:** `main`. The API-0 commits `fd31d85`…`6f64d66` and this close-out are **not yet pushed**.
 
 ---
 
@@ -134,6 +134,21 @@ machinery is frozen as historical research infrastructure and is not migrated. N
 consumes Noetica through a published package. Velith does not yet produce physical-engineering results or
 expose the `EngineeringTask` / `EngineeringResult` / `DesignArtifact` API, and is not yet published as a
 package.
+
+**API-0 (Engineering API v0) — complete, not released** (D33, 2026-10-30; `docs/API_V0_SPEC.md`;
+`fd31d85`…`6f64d66`; details in §13). Velith now exposes the Layer-3 public API named by D30 item 1, for
+the **software domain only**: `EngineeringTask`, `EngineeringResult` and `DesignArtifact` in
+`src/velith/api/`, a five-field wire object of exactly the shape of Mini Prometheus' consumed stub, a
+content identity a consumer can recompute (Option B), and `SweVerifier`, which turns one grounded sandbox
+verdict into either a public result or an `UnverifiedOutcome` under a verification rule deliberately
+stricter than the frozen M7 rule. The package version is `0.1.0` and its installed wheel passes the
+release gate. A real sandbox run reproduces the normative identity vectors, and an independent Mini
+Prometheus-side consumer check (Velith-research `74716ba`) validates the records. This supersedes the
+first half of the D30 note above (the API now exists); the second half still holds: Velith is **not
+published** — nothing is pushed and no `v0.1.0` tag exists. API-0 modifies no M1–M10 code, test or
+existing record (new records carry version `0.1.0`; §13). SFG statistical feasibility remains
+**DEFERRED, NOT VERIFIED**, **no M10 go/no-go is authorized**, and the **physical/manufacturing path
+remains closed** (D5/D12/D31).
 
 ## 2. M1 objectives and achievements
 
@@ -595,3 +610,86 @@ and A0 remains the memoryless baseline. No M8 work blocks M9.
 
 **Repository is M9-ready.** Begin M9 only against its own ratified engineering specification and
 implementation handoff, in the same atomic, gate-verified workflow used for M1–M8.
+
+## 13. API-0 (Engineering API v0) objectives, achievements, and verification
+
+API-0 is a separate, software-only milestone outside the M-sequence (D33), governed by
+`docs/API_V0_SPEC.md` (spec r4 + ID-1, ratified 2026-10-30). Every API-0 goal was met, confined to new
+code under `src/velith/api/` and `tools/` plus the packaging change; no frozen M1–M9 module or test was
+modified:
+
+- **Contract core** (C1) — `EngineeringTask`, `DesignArtifact`, `EngineeringResult`, `UnverifiedOutcome`
+  and `ReceivedEngineeringResult`; the wire object is exactly the five fields of Mini Prometheus' consumed
+  stub. Identity is Option B: the wire object without `result_id`/`content_hash` plus
+  `identity_version = "velith-engineering-result-identity-v1"`, hashed as canonical JSON with SHA-256
+  through Noetica's `canonical_sha256`; `result_id = uuid5(NS_VELITH_API, content_hash)` (ID-1: it names
+  the content claim, not a run). The normative vectors T1–T5b are pinned in `tests/unit/test_api_vectors.py`.
+- **Public verification rule** (C1/C2) — PASSED, not flaky over at least two primary runs, held-out
+  secondary suite passed, network isolation on. Deliberately stricter than the frozen M7
+  `is_verified_success`, which is unchanged; `secondary_passed = None` yields `SECONDARY_ABSENT`.
+- **`SweVerifier` adapter** (C2) — implements Noetica's `Verifier` protocol by wrapping the unmodified
+  M2 `VerifierSandbox`; it constructs the sandbox itself and reports exactly the timeout, isolation and
+  rerun values it supplied (K1); `SandboxExecutionError` propagates and produces nothing (K2).
+  `velith.api` stays contract-only and does not load the harness.
+- **Packaging** (C3) — `__version__ = "0.1.0"` as the single version source (Hatch dynamic version,
+  `hatchling==1.32.4`), `py.typed`, Noetica `v1.0.0` (commit `44d380b`) as a pinned git dependency, and the
+  manual fail-closed release gate `tools/verify_installed_wheel.py`. The version change is not
+  behaviour-neutral for *new* records (new spike-episode hash lineage, new M9/M10 result-record identities,
+  API results at `0.1.0`); no existing record is rewritten (`docs/API_V0_SPEC.md` §8 C3).
+- **Producer demonstration** (C4a) — `tools/api_v0_demo.py` runs `calc_add_bug` through `SweVerifier`
+  (isolation on, three primary runs): the correct T3 patch yields a verified result equal to T3, T5a,
+  T4-B and T5b; wrong and malformed patches yield `UnverifiedOutcome(VERDICT_NOT_PASSED)` and no record.
+  Each verified run writes one record `data/api_v0/<result_id>__<run-utc>.json` (git-ignored, exclusive
+  creation, never overwritten) with the wire object, `task_id`, evidence and Noetica-serialized provenance.
+- **Independent consumer validation** (C4b, in Velith-research `api0/`, commit `74716ba`) — Mini
+  Prometheus-side code that never imports Velith: a throwaway Python 3.12 environment with Mini
+  Prometheus installed from commit `ab8cc449081c3fd6f36634824daaee267b4aad03`, Draft 2020-12 validation
+  of the consumed stub with format checking, explicit UUID checks, §3.6 identity recomputation with Mini
+  Prometheus' `_hashing.content_hash`, record-structure checks, in-memory tamper controls and the
+  generated binding. It lives outside Velith so that Velith imports nothing from Mini Prometheus (D30
+  item 4), and Mini Prometheus is unchanged.
+- **Documentation correction** (C4c) — `docs/API_V0_SPEC.md` §6.2 local-records notes.
+
+**Commit ledger (atomic, conventional):**
+
+| Commit | Subject |
+|---|---|
+| `fd31d85` | docs(api-0): record D33 and the ratified Engineering API v0 spec (C0) |
+| `08ffd83` | feat(api-0): engineering API v0 contract core — types, identity, validation, vectors (C1) |
+| `babadf3` | feat(api-0): SweVerifier adapter — sandbox verdict to API evidence (C2) |
+| `1d1baae` | build(api-0): velith 0.1.0 packaging and installed-wheel release gate (C3) |
+| `c602493` | feat(api-0): producer demo and verified-result records (C4a) |
+| `6f64d66` | docs(api-0): correct §6.2 local-records notes (C4c) |
+| Velith-research `74716ba` | feat(api-0): add isolated consumer validation (C4b) |
+
+**Verification evidence.** The Docker gate (`ruff check`, `ruff format --check`, `mypy`, `pytest -q -rs`,
+inside the verifier image) was run green by the Research Director in WSL for C1, C2, C3 and C4a, with no
+API-0 isolation skips reported; from C3 the gate also ran `tools/verify_installed_wheel.py` with zero
+failures. Two real producer runs wrote two records with the same `result_id`
+`2ac44842-2b16-5dbe-ae75-028dd4d44a26` and `content_hash` (T4-B) and distinct run timestamps; their wire
+objects are byte-identical. The authoritative Python 3.12 Docker consumer check (C4b) ended with
+`0 failure(s)`. Exact test counts and the `jsonschema`/`referencing` versions resolved in that run are
+recorded in the Research Director's run output, not here.
+
+**Boundaries kept.** Software domain only. SFG statistical feasibility remains **DEFERRED, NOT
+VERIFIED**. **No M10 go/no-go is authorized.** The **physical/manufacturing path remains closed** under
+D5/D12/D31, and the v0 demonstration calls no Mini Prometheus manufacturing pipeline. **Nothing is
+pushed and no `v0.1.0` release tag exists**, so the release is not published.
+
+**Known limitations and deferred work.**
+
+- The content hash detects accidental change only: no authenticity, no non-repudiation, no proof that
+  verification occurred (spec §4). Evidence and provenance are local and outside the identity.
+- The held-out secondary suite runs once, without flake detection; tasks without a secondary suite cannot
+  produce a public result.
+- `SweVerifier` resolves only `calc_add_bug` and needs the fixtures, which are not packaged (K4).
+- The consumer check's `jsonschema` version is resolved, not pinned (Mini Prometheus pins only `>=4.18`).
+- Deferred C3 documentation notes: the release-gate docstring places the Noetica provenance check in
+  stage C (it runs on stage D output), and §8 does not describe the role of
+  `constraints/analysis-py312.txt`.
+- Pre-existing gaps, unchanged here: `docs/DECISIONS.md` has no index row for D32, and this file does not
+  yet describe D32 (`29fd12f`).
+
+**Next, outside API-0:** Mini Prometheus RM6 may consume Velith `0.1.0` only after its own prerequisite
+gates — a Python 3.12 environment with its goldens re-verified (R1) and the media-type guard refusing
+software results in `from_engineering_result` (R2) — and after the `v0.1.0` tag decision.
