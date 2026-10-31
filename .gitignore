@@ -34,6 +34,9 @@ htmlcov/
 # Generated episode store (M1) — grounded experience data, never tracked (handoff §4.10)
 /data/episodes/
 
+# Engineering API v0 demo records (API-0 C4a, API_V0_SPEC §6.2) — local evidence, never tracked
+/data/api_v0/
+
 # Node / Next.js (web app alongside the Python project)
 node_modules/
 .next/
