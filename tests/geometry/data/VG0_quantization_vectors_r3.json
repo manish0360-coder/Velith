@@ -1,0 +1,135 @@
+{
+ "vector_set": "VG-0",
+ "rule": "API v0.2 r3 \u00a72 (R-API-1, q-1)",
+ "vectors": [
+  {
+   "kind": "length_mm",
+   "input_repr": "0.0",
+   "input_hex": "0x0.0p+0",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "-0.0",
+   "input_hex": "-0x0.0p+0",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "1e-12",
+   "input_hex": "0x1.19799812dea11p-40",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "-1e-12",
+   "input_hex": "-0x1.19799812dea11p-40",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "-4.999999e-07",
+   "input_hex": "-0x1.0c6f7686a68bdp-21",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "5e-07",
+   "input_hex": "0x1.0c6f7a0b5ed8dp-21",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "-5e-07",
+   "input_hex": "-0x1.0c6f7a0b5ed8dp-21",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "1.5e-06",
+   "input_hex": "0x1.92a737110e454p-20",
+   "expected": "0.000002"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "-1e-06",
+   "input_hex": "-0x1.0c6f7a0b5ed8dp-20",
+   "expected": "-0.000001"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "6.6",
+   "input_hex": "0x1.a666666666666p+2",
+   "expected": "6.600000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "100.0",
+   "input_hex": "0x1.9000000000000p+6",
+   "expected": "100.000000"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "0.30000000000000004",
+   "input_hex": "0x1.3333333333334p-2",
+   "expected": "0.300000"
+  },
+  {
+   "kind": "area_mm2",
+   "input_repr": "-0.0",
+   "input_hex": "-0x0.0p+0",
+   "expected": "0.0000"
+  },
+  {
+   "kind": "area_mm2",
+   "input_repr": "12345.678949999",
+   "input_hex": "0x1.81cd6e7d564aap+13",
+   "expected": "12345.6789"
+  },
+  {
+   "kind": "volume_mm3",
+   "input_repr": "58631.52224009624",
+   "input_hex": "0x1.ca0f0b630dcc0p+15",
+   "expected": "58631.522"
+  },
+  {
+   "kind": "volume_mm3",
+   "input_repr": "-0.0004",
+   "input_hex": "-0x1.a36e2eb1c432dp-12",
+   "expected": "0.000"
+  },
+  {
+   "kind": "direction",
+   "input_repr": "-0.0",
+   "input_hex": "-0x0.0p+0",
+   "expected": "0.000000"
+  },
+  {
+   "kind": "direction",
+   "input_repr": "-1.0",
+   "input_hex": "-0x1.0000000000000p+0",
+   "expected": "-1.000000"
+  },
+  {
+   "kind": "direction",
+   "input_repr": "0.7071067811865476",
+   "input_hex": "0x1.6a09e667f3bcdp-1",
+   "expected": "0.707107"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "nan",
+   "expected": "REJECTED"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "inf",
+   "expected": "REJECTED"
+  },
+  {
+   "kind": "length_mm",
+   "input_repr": "-inf",
+   "expected": "REJECTED"
+  }
+ ]
+}

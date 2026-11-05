@@ -1,0 +1,86 @@
+{
+ "spec": "Engineering API v0.2 F r3 \u00a76",
+ "vector_set": "VG-1..VG-12",
+ "vectors": {
+  "BP-01": {
+   "artifact": "sha256:8c0f1b329025e687f63f31ff3354f6ae0b728e9a04cb219bdcf2f059978192c6",
+   "content_hash": "sha256:48cad222fbb7c5bacd9f2a7007473c2e0d7719d8e7cbdfd1e94257ec9c103b46",
+   "facts_hash": "sha256:cb0cb3759315198ce8cb08dabb82b9ea6da4cc0045734c73dfbc7a99f0caec14",
+   "outcome": "VERIFIED",
+   "result_id": "2557736d-8f5f-5f24-ad71-00984e098d13",
+   "vector": "VG-1"
+  },
+  "BP-02": {
+   "artifact": "sha256:87022c2106ba55a7c09662d6dae461f7c5e0e84c9baef5ad5c729b3d66b1c75b",
+   "content_hash": "sha256:d76f1b995da3e385cde95d1b2f3c039c9a4be1ff4f912f5130fda42b7c4a73c7",
+   "facts_hash": "sha256:51748e37dc263076fee7038db5dd240106b1e2760ef6cfc0761d997f02f667ae",
+   "outcome": "VERIFIED",
+   "result_id": "bc2947a6-149c-586b-b386-9294a3dd6378",
+   "vector": "VG-2"
+  },
+  "BP-03": {
+   "artifact": "sha256:b4e9e7a220b0897347a9826192473b07b5cb9e73b3ead726252d3255ccb8d379",
+   "content_hash": "sha256:6f21d54a22553aecf3c23d6a9f409fbb054fbe73d52fa0bfe4b1f33c938cf78a",
+   "facts_hash": "sha256:552a560b241d3b847ed2d61569099dbfa0507792ef481f6b402285b61fbcc574",
+   "outcome": "VERIFIED",
+   "result_id": "9078e6df-7783-51f2-8761-9e061b3ae79e",
+   "vector": "VG-3"
+  },
+  "BP-04": {
+   "artifact": "sha256:914a4223b0edea7542ce0eb486692df1172fb1176abf85de9e6c07e39ac648cc",
+   "content_hash": "sha256:6db4beb63e65f685f3edb8986292d3876565b76582ad89245a070a851d730c23",
+   "facts_hash": "sha256:02e55ca3255e30df4a691778de0087aa83deb5223e3aeff063a16c63632710f2",
+   "outcome": "VERIFIED",
+   "result_id": "6ecb1933-7d30-576e-817b-41322a07c95d",
+   "vector": "VG-4"
+  },
+  "CR-01": {
+   "artifact": "sha256:8c0f1b329025e687f63f31ff3354f6ae0b728e9a04cb219bdcf2f059978192c6",
+   "facts_hash": "sha256:649ebf9b39a388b74155cd485b4e17b29baba865e39c366a6a29e1b66d294f01",
+   "outcome": "REQUIREMENT_NOT_MET",
+   "vector": "VG-5"
+  },
+  "CR-02": {
+   "artifact": "sha256:78281bd65c0680e8a49c061467d21b6cb1d8af83dde2e682ff59d4b9141491cb",
+   "facts_hash": "sha256:ea32c1003448ac22f9853c2808b6465474433d8673bbccbec69d12fadb814d52",
+   "outcome": "REQUIREMENT_NOT_MET",
+   "vector": "VG-6"
+  },
+  "CR-03": {
+   "artifact": "sha256:914a4223b0edea7542ce0eb486692df1172fb1176abf85de9e6c07e39ac648cc",
+   "facts_hash": "sha256:6003ed9f297c4c92ccfc24f0d6d2e4e52f623ad7fea3605af9f470ed7fdb05eb",
+   "outcome": "REQUIREMENT_NOT_MET",
+   "vector": "VG-7"
+  },
+  "NC-01": {
+   "artifact": "sha256:e103d8e95a06b0b3e7763f29fb1a2634b43e38458d3793ab7e3886a70aec59dd",
+   "facts_hash": "sha256:1311c2b6219783cd52e07cf1962db0c4fa73e0899ab17b024763a72e7a56f8df",
+   "outcome": "NOT_A_CLOSED_SOLID",
+   "vector": "VG-8"
+  },
+  "NC-02": {
+   "artifact": "sha256:d21abbfcebb9710cdd7a0bd68283d2ba6cda6deb26078284e87a47bb78dee4cf",
+   "facts_hash": "sha256:f42dd3211e0c215dfb31f18a1db55bad4e6fc991d5d6843a9c307f3b6bd666b4",
+   "outcome": "SOLID_COUNT_MISMATCH",
+   "vector": "VG-9"
+  },
+  "NC-03": {
+   "artifact": "sha256:7f271448707ba54a92bcfe2566b626bd2a9a4fff2454aaa635080df3e1907b27",
+   "facts_hash": null,
+   "outcome": "PARSE_FAILED",
+   "vector": "VG-10"
+  },
+  "NC-04": {
+   "artifact": "sha256:ca5fd7486a0314f25ebdd2eaf50c05f7c4fe626e2451226f302e383af88f193d",
+   "facts_hash": "sha256:054c5563af72f9a2d69bb74595e7892627b9af68bbaeaca428ba01e350ae3c99",
+   "outcome": "UNIT_IMPLAUSIBLE",
+   "vector": "VG-11"
+  },
+  "NC-05": {
+   "artifact": "sha256:915b7b343f4b600ad363fd2be472286f5a66ef2fa8687e405e23a6b8642f583d",
+   "facts_hash": null,
+   "outcome": "NO_GEOMETRY",
+   "vector": "VG-12"
+  }
+ }
+}

@@ -39,6 +39,13 @@ COPY src/ ./src/
 # boundary (handoff OED-3/OED-5). A comment-only constraints file imposes nothing on the
 # first (bootstrap) resolve; once populated it pins the exact transitive graph.
 RUN pip install -c constraints/analysis-py312.txt ".[dev,analysis]"
+# G0 (D34; Engineering API v0.2): the `geometry` extra, installed from hash-pinned wheels only.
+# The OCCT binding's extension module links against the system libGL/libX11/libexpat (it bundles
+# every other library), which the slim base image lacks; nothing renders, they are only loaded.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libx11-6 libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-deps --require-hashes -r constraints/geometry-py312.txt
 
 # Tests are not part of the installed package; copy them in for execution.
 COPY tests/ ./tests/

@@ -50,6 +50,10 @@ from velith.task import FIXTURE_TASK_ID, Task, load_fixture_task
 #: The provenance ``transform``: the frozen seam that produced the grounded verdict.
 PROVENANCE_TRANSFORM: Final[str] = "velith.harness.VerifierSandbox.verify"
 
+#: The SWE verifier's component version on the wire (D35 r2 item 1). It is not the package version:
+#: releasing Velith 0.2.0 leaves every software identity (T4-B/T5b) unchanged.
+SWE_VERIFIER_VERSION: Final[str] = "0.1.0"
+
 
 def resolve_task(task: EngineeringTask, *, fixtures_root: Path | None = None) -> Task:
     """Resolve an API task to the frozen Velith ``Task`` it names.
@@ -128,8 +132,8 @@ class SweVerifier:
 
     @property
     def identity(self) -> VerifierIdentity:
-        """``verifier`` on the wire: this component at the running Velith version."""
-        return VerifierIdentity(component=SWE_VERIFIER_COMPONENT, version=__version__)
+        """``verifier`` on the wire: this component at its own version (D35 r2 item 1)."""
+        return VerifierIdentity(component=SWE_VERIFIER_COMPONENT, version=SWE_VERIFIER_VERSION)
 
     def __enter__(self) -> SweVerifier:
         return self

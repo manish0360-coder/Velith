@@ -1,0 +1,20 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('synthetic PMI snippet for the r2 disclosure test; not a valid product model'),'2;1');
+FILE_NAME('pmi.step','2026-11-04T00:00:00',(''),(''),'','','');
+FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 1 1 4 }'));
+ENDSEC;
+DATA;
+#10=DIMENSIONAL_SIZE(#11,'diameter');
+#12=DIMENSIONAL_LOCATION('dist','',#13,#14);
+#20=POSITION_TOLERANCE('pos','',#21,#22);
+#23=(GEOMETRIC_TOLERANCE('flat','',#24,#25) FLATNESS_TOLERANCE() );
+#30=DATUM('A','',#31,.F.,'A');
+#31=DATUM_FEATURE('A','',#32,.T.);
+#40=DRAUGHTING_CALLOUT('callout',(#41));
+#41=ANNOTATION_PLANE('',(#42),#43,(#44));
+#50=PRODUCT('p','note: DATUM( and POSITION_TOLERANCE( inside a string must not count','',(#51));
+/* DIMENSIONAL_SIZE( inside a comment must not count */
+#60=CARTESIAN_POINT('',(0.,0.,0.));
+ENDSEC;
+END-ISO-10303-21;

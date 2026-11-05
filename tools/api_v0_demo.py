@@ -37,7 +37,6 @@ from typing import Any
 from noetica.interfaces.verification import VerdictStatus
 from noetica.provenance.identity import serialize_provenance
 
-import velith
 from velith.api import (
     EngineeringResult,
     EngineeringTask,
@@ -48,7 +47,7 @@ from velith.api import (
     from_wire,
 )
 from velith.api.contract import DesignArtifact
-from velith.api.swe import SweVerifier
+from velith.api.swe import SWE_VERIFIER_VERSION, SweVerifier
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES_ROOT = ROOT / "tests" / "fixtures"
@@ -113,9 +112,9 @@ def evaluate(verifier: SweVerifier, patch: str) -> EngineeringResult | Unverifie
 
 def check_configuration() -> bool:
     ok = check(
-        velith.__version__ == RELEASE_VERSION,
-        f"velith version is {RELEASE_VERSION}",
-        velith.__version__,
+        SWE_VERIFIER_VERSION == RELEASE_VERSION,  # D35 r2: the SWE component version
+        f"SWE verifier component version is {RELEASE_VERSION}",
+        SWE_VERIFIER_VERSION,
     )
     ok &= check(RECORDS_DIR.is_dir(), f"records directory {RECORDS_DIR} exists")
     ok &= check(

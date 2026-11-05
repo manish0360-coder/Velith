@@ -32,6 +32,11 @@ dev = [
 analysis = [
     "statsmodels==0.15.0",
 ]
+# G0 exact-geometry verifier (D34; Engineering API v0.2): the pinned OCCT 8.0.1 binding (spec E).
+# Installed hash-pinned from constraints/geometry-py312.txt; only velith.geometry._kernel imports it.
+geometry = [
+    "cadquery-ocp-novtk==8.0.1.1.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/velith"]
@@ -81,6 +86,12 @@ no_implicit_reexport = true
 # analysis/wald.py adapter (M9-C10).
 [[tool.mypy.overrides]]
 module = ["statsmodels.*", "scipy.*"]
+ignore_missing_imports = true
+
+# Scoped override (G0): the OCCT binding ships no type stubs. Its only importer is the isolated
+# worker velith/geometry/_kernel.py, which treats every kernel object as Any at that boundary.
+[[tool.mypy.overrides]]
+module = ["OCP.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

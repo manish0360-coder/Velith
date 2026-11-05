@@ -18,7 +18,6 @@ from typing import Any, ClassVar
 import pytest
 from noetica.interfaces.verification import Verdict, VerdictStatus, Verifier
 
-from velith import __version__
 from velith.api import (
     SWE_VERIFIER_COMPONENT,
     ContractError,
@@ -30,7 +29,12 @@ from velith.api import (
     unverified_reason,
 )
 from velith.api import swe as api_swe
-from velith.api.swe import SweVerifier, evidence_from_sandbox_verdict, resolve_task
+from velith.api.swe import (
+    SWE_VERIFIER_VERSION,
+    SweVerifier,
+    evidence_from_sandbox_verdict,
+    resolve_task,
+)
 from velith.core.config import get_settings
 from velith.episodes.episode import VerdictState
 from velith.harness.verifier_sandbox import Verdict as SandboxVerdict
@@ -183,10 +187,11 @@ def test_rerun_count_below_one_is_refused(reruns: int) -> None:
         SweVerifier(network_isolation=False, flake_rerun_count=reruns)
 
 
-def test_identity_is_the_swe_component_at_the_running_version() -> None:
+def test_identity_is_the_swe_component_at_its_component_version() -> None:
+    # D35 r2: the wire version is the SWE component constant, not the package version.
     with SweVerifier(network_isolation=False, flake_rerun_count=3) as verifier:
         assert verifier.identity.component == SWE_VERIFIER_COMPONENT
-        assert verifier.identity.version == __version__
+        assert verifier.identity.version == SWE_VERIFIER_VERSION == "0.1.0"
 
 
 # --- Task resolution and pre-run checks -------------------------------------------------------

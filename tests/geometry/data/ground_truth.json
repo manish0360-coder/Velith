@@ -1,0 +1,216 @@
+{
+ "benchmark_id": "G0-BENCH-01",
+ "method": "closed-form from parts.json; no CAD kernel",
+ "parts": {
+  "BP-01": {
+   "bbox_mm": [
+    100,
+    60,
+    10
+   ],
+   "closed": true,
+   "full_cylindrical_hole_faces": 4,
+   "genus": 4,
+   "hole_count": 4,
+   "hole_diameters_mm": [
+    6.6,
+    6.6,
+    6.6,
+    6.6
+   ],
+   "holes": [
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    }
+   ],
+   "planar_faces": 6,
+   "pocket": null,
+   "solids": 1,
+   "units": "mm",
+   "volume_mm3": 58631.522240096296
+  },
+  "BP-02": {
+   "bbox_mm": [
+    80,
+    50,
+    30
+   ],
+   "closed": true,
+   "full_cylindrical_hole_faces": 3,
+   "genus": 1,
+   "hole_count": 3,
+   "hole_diameters_mm": [
+    8.0,
+    8.0,
+    10.0
+   ],
+   "holes": [
+    {
+     "axis": "X",
+     "depth_mm": 80,
+     "diameter_mm": 10.0,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 15,
+     "diameter_mm": 8.0,
+     "through": false
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 15,
+     "diameter_mm": 8.0,
+     "through": false
+    }
+   ],
+   "planar_faces": 8,
+   "pocket": null,
+   "solids": 1,
+   "units": "mm",
+   "volume_mm3": 112208.8502190973
+  },
+  "BP-03": {
+   "bbox_mm": [
+    120,
+    80,
+    12
+   ],
+   "closed": true,
+   "full_cylindrical_hole_faces": 2,
+   "genus": 2,
+   "hole_count": 2,
+   "hole_diameters_mm": [
+    8.0,
+    8.0
+   ],
+   "holes": [
+    {
+     "axis": "Z",
+     "depth_mm": 12,
+     "diameter_mm": 8.0,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 12,
+     "diameter_mm": 8.0,
+     "through": true
+    }
+   ],
+   "planar_faces": 11,
+   "pocket": {
+    "corner_faces_cylindrical": 4,
+    "corner_radius_mm": 6,
+    "depth_mm": 5,
+    "plan_area_mm2": 2369.0973355292326
+   },
+   "solids": 1,
+   "units": "mm",
+   "volume_mm3": 102148.14174337534
+  },
+  "BP-04": {
+   "bbox_mm": [
+    80,
+    50,
+    50
+   ],
+   "closed": true,
+   "full_cylindrical_hole_faces": 3,
+   "genus": 3,
+   "hole_count": 3,
+   "hole_diameters_mm": [
+    6.6,
+    6.6,
+    8.4
+   ],
+   "holes": [
+    {
+     "axis": "Y",
+     "depth_mm": 10,
+     "diameter_mm": 8.4,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    }
+   ],
+   "planar_faces": 8,
+   "pocket": null,
+   "solids": 1,
+   "units": "mm",
+   "volume_mm3": 70761.58417595491
+  },
+  "CR-02-GEOM": {
+   "bbox_mm": [
+    100,
+    60,
+    10
+   ],
+   "closed": true,
+   "full_cylindrical_hole_faces": 3,
+   "genus": 3,
+   "hole_count": 3,
+   "hole_diameters_mm": [
+    6.6,
+    6.6,
+    6.6
+   ],
+   "holes": [
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    },
+    {
+     "axis": "Z",
+     "depth_mm": 10,
+     "diameter_mm": 6.6,
+     "through": true
+    }
+   ],
+   "planar_faces": 6,
+   "pocket": null,
+   "solids": 1,
+   "units": "mm",
+   "volume_mm3": 58973.64168007222
+  }
+ }
+}

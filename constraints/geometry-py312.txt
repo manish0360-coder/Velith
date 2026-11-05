@@ -1,0 +1,7 @@
+# G0 geometry extra (D34; Engineering API v0.2; Gate 0 spec E): hash-pinned, linux-x86_64, CPython 3.12.
+# Install with: pip install --no-deps --require-hashes -r constraints/geometry-py312.txt
+# Hashes are the PyPI SHA-256 digests of the exact wheels (cadquery-ocp-novtk wheel: 66,825,837 bytes).
+cadquery-ocp-novtk==8.0.1.1.0 \
+    --hash=sha256:9df1e3700016bee819c0a8627880f37de47540eef63e8adb368f659a0fdeff78
+cadquery-ocp-proxy==8.0.1.1.0 \
+    --hash=sha256:98c71bb60cfb651afe179b134ab88580fd75384fce0cc6d633f727002cd18abd

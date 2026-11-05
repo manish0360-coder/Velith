@@ -1,0 +1,261 @@
+{
+ "vector_set": "VG-R",
+ "rule": "API v0.2 r3 §3 field-specific requirements (CH3-R1)",
+ "length": [
+  {
+   "input": "6.6",
+   "expected": "6.600000"
+  },
+  {
+   "input": "6.60",
+   "expected": "6.600000"
+  },
+  {
+   "input": "6.600000",
+   "expected": "6.600000"
+  },
+  {
+   "input": "6.6000000",
+   "expected": "6.600000"
+  },
+  {
+   "input": "6.6000004",
+   "expected": "6.6000004"
+  },
+  {
+   "input": "25.4",
+   "expected": "25.400000"
+  },
+  {
+   "input": "12.7000",
+   "expected": "12.700000"
+  },
+  {
+   "input": "0.1984375",
+   "expected": "0.1984375"
+  },
+  {
+   "input": "0.396875",
+   "expected": "0.396875"
+  },
+  {
+   "input": "7.9375",
+   "expected": "7.937500"
+  },
+  {
+   "input": "0.00254",
+   "expected": "0.002540"
+  },
+  {
+   "input": "0.001",
+   "expected": "0.001000"
+  },
+  {
+   "input": "10000",
+   "expected": "10000.000000"
+  },
+  {
+   "input": "0",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "0.0",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "-0",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "-1.5",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "1e1",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "+6.6",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "06.6",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "6.",
+   "expected": "REJECTED"
+  },
+  {
+   "input": ".6",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "NaN",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "Infinity",
+   "expected": "REJECTED"
+  },
+  {
+   "input": " 6.6",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "6.6\n",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "6,6",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "٦.٦",
+   "expected": "REJECTED"
+  }
+ ],
+ "tolerance": [
+  {
+   "input": "0.000001",
+   "expected": "0.000001"
+  },
+  {
+   "input": "0.0000010",
+   "expected": "0.000001"
+  },
+  {
+   "input": "0.0000005",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "0.00127",
+   "expected": "0.001270"
+  },
+  {
+   "input": "0.0005",
+   "expected": "0.000500"
+  },
+  {
+   "input": "0",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "-0.01",
+   "expected": "REJECTED"
+  }
+ ],
+ "count": [
+  {
+   "input": "1",
+   "expected": "1"
+  },
+  {
+   "input": "4",
+   "expected": "4"
+  },
+  {
+   "input": "10",
+   "expected": "10"
+  },
+  {
+   "input": "0",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "01",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "-1",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "1.0",
+   "expected": "REJECTED"
+  },
+  {
+   "input": "",
+   "expected": "REJECTED"
+  },
+  {
+   "input": " 1",
+   "expected": "REJECTED"
+  }
+ ],
+ "inch_derived": [
+  {
+   "label": "1/128 in",
+   "inch": "0.0078125",
+   "mm_exact": "0.19843750",
+   "expected": "0.1984375"
+  },
+  {
+   "label": "1/64 in",
+   "inch": "0.015625",
+   "mm_exact": "0.3968750",
+   "expected": "0.396875"
+  },
+  {
+   "label": "5/16 in",
+   "inch": "0.3125",
+   "mm_exact": "7.93750",
+   "expected": "7.937500"
+  },
+  {
+   "label": "0.0001 in",
+   "inch": "0.0001",
+   "mm_exact": "0.00254",
+   "expected": "0.002540"
+  },
+  {
+   "label": "0.2500 in",
+   "inch": "0.2500",
+   "mm_exact": "6.35000",
+   "expected": "6.350000"
+  },
+  {
+   "label": "1.0005 in",
+   "inch": "1.0005",
+   "mm_exact": "25.41270",
+   "expected": "25.412700"
+  }
+ ],
+ "compare_within": [
+  {
+   "measured": "0.198438",
+   "nominal": "0.1984375",
+   "tol": "0.000001",
+   "expected": true,
+   "binary_float_would_say": true
+  },
+  {
+   "measured": "0.198439",
+   "nominal": "0.1984375",
+   "tol": "0.000001",
+   "expected": false,
+   "binary_float_would_say": false
+  },
+  {
+   "measured": "6.600001",
+   "nominal": "6.6",
+   "tol": "0.000001",
+   "expected": true,
+   "binary_float_would_say": false
+  },
+  {
+   "measured": "6.599999",
+   "nominal": "6.6",
+   "tol": "0.000001",
+   "expected": true,
+   "binary_float_would_say": true
+  },
+  {
+   "measured": "6.600002",
+   "nominal": "6.6",
+   "tol": "0.000001",
+   "expected": false,
+   "binary_float_would_say": false
+  }
+ ]
+}

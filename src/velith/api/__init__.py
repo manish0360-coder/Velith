@@ -1,9 +1,10 @@
-"""Velith Engineering API v0 — the Layer 3 public contract (D33; ``docs/API_V0_SPEC.md``).
+"""Velith Engineering API — the Layer 3 public contract (D33; ``docs/API_V0_SPEC.md``; D34/D35).
 
-Software domain only. This package owns ``EngineeringTask``, ``EngineeringResult`` and
-``DesignArtifact``; Mini Prometheus consumes the five-field wire form of ``EngineeringResult``.
+v0 (software): ``EngineeringTask``, ``EngineeringResult`` and ``DesignArtifact``; Mini Prometheus
+consumes the five-field wire form of ``EngineeringResult``. v0.2 (geometry, G0; Gate 0 spec F r3):
+``GeometryTask``, ``StepArtifact``, ``GeometryEngineeringResult`` and its ``ResultBundle``.
 It imports Noetica (pinned) and frozen Velith domain types, and never ``mini_prometheus``,
-``miniflywire`` or ``velith.analysis``.
+``miniflywire``, ``velith.analysis``, ``velith.geometry`` or ``OCP``.
 """
 
 from velith.api.contract import (
@@ -37,15 +38,45 @@ from velith.api.contract import (
     result_from_verification,
     unverified_reason,
 )
+from velith.api.geometry_contract import (
+    BUNDLE_SCHEMA_VERSION,
+    FACTS_SCHEMA_VERSION,
+    GEOMETRY_VERIFIER_COMPONENT,
+    GEOMETRY_VERIFIER_VERSION,
+    IDENTITY_VERSION_V2,
+    MEDIA_TYPE_GEOMETRY_FACTS,
+    MEDIA_TYPE_STEP,
+    REQUIREMENTS_SCHEMA_VERSION,
+    GeometryEngineeringResult,
+    GeometryFactsRef,
+    GeometryReason,
+    GeometryTask,
+    GeometryUnverifiedOutcome,
+    ReceivedGeometryResult,
+    RequirementError,
+    StepArtifact,
+    canonical_requirements,
+    facts_hash,
+    from_bundle,
+    identity_view_v2,
+)
 
 __all__ = [
     "ARTIFACT_SCHEMA_VERSION",
+    "BUNDLE_SCHEMA_VERSION",
     "CONTENT_HASH_PATTERN",
+    "FACTS_SCHEMA_VERSION",
+    "GEOMETRY_VERIFIER_COMPONENT",
+    "GEOMETRY_VERIFIER_VERSION",
     "IDENTITY_VERSION",
+    "IDENTITY_VERSION_V2",
+    "MEDIA_TYPE_GEOMETRY_FACTS",
+    "MEDIA_TYPE_STEP",
     "MEDIA_TYPE_SWE_PATCH",
     "MIN_FLAKE_RERUNS",
     "NS_VELITH_API",
     "NS_VELITH_API_NAME",
+    "REQUIREMENTS_SCHEMA_VERSION",
     "SEMVER_PATTERN",
     "SWE_VERIFIER_COMPONENT",
     "VERDICT_STATUS_BY_STATE",
@@ -55,17 +86,29 @@ __all__ = [
     "DesignArtifactRef",
     "EngineeringResult",
     "EngineeringTask",
+    "GeometryEngineeringResult",
+    "GeometryFactsRef",
+    "GeometryReason",
+    "GeometryTask",
+    "GeometryUnverifiedOutcome",
     "ReceivedEngineeringResult",
+    "ReceivedGeometryResult",
+    "RequirementError",
+    "StepArtifact",
     "SwePatch",
     "SwePatchPayload",
     "UnverifiedOutcome",
     "UnverifiedReason",
     "VerificationEvidence",
     "VerifierIdentity",
+    "canonical_requirements",
     "content_hash_of",
     "derive_id",
+    "facts_hash",
+    "from_bundle",
     "from_wire",
     "identity_view",
+    "identity_view_v2",
     "result_from_verification",
     "unverified_reason",
 ]

@@ -27,6 +27,14 @@ Stages:
      ``SweVerifier`` is never instantiated and no fixture is used (K4);
   F. vectors: ``tests/unit/test_api_vectors.py`` alone, run against the installed wheel, must report
      exactly 5 passed and nothing skipped, xfailed, errored, failed or uncollected.
+
+Geometry (G0, Engineering API v0.2; Gate 0 spec F r3 §7):
+  G-a. importing ``velith.api`` loads neither ``OCP`` nor ``velith.geometry`` (part of stage D);
+  G-b. after installing the hash-pinned ``geometry`` extra (``constraints/geometry-py312.txt``),
+       a fresh ``python -I`` process imports ``velith.geometry.verifier`` from the venv, the binding
+       is the pinned version and the host passes the identity-platform check;
+  G-c. vectors: ``tests/geometry/test_vg_vectors.py`` (VG-0, VG-R and the VG-1..VG-12 benchmark
+       vectors, which run the real worker) passes against the installed wheel with nothing skipped.
 """
 
 from __future__ import annotations
@@ -49,7 +57,7 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "velith"
 #: The release this gate certifies. Changing it is a deliberate release decision.
-RELEASE_VERSION = "0.1.0"
+RELEASE_VERSION = "0.2.0"
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 
 EXPECTED_REQUIRES_PYTHON = "==3.12.*"
@@ -64,7 +72,15 @@ REQUIRED_WHEEL_FILES = {
     "velith/api/__init__.py",
     "velith/api/contract.py",
     "velith/api/swe.py",
+    "velith/api/geometry_contract.py",
     "velith/api/schemas/engineering_result.v1.schema.json",
+    "velith/geometry/__init__.py",
+    "velith/geometry/__main__.py",
+    "velith/geometry/_kernel.py",
+    "velith/geometry/_protocol.py",
+    "velith/geometry/annotation_scan.py",
+    "velith/geometry/rules.py",
+    "velith/geometry/verifier.py",
 }
 
 NOETICA_VERSION = "1.0.0"
@@ -82,13 +98,25 @@ CONTRACT_FORBIDDEN = (
     "statsmodels",
     "mini_prometheus",
     "miniflywire",
+    "velith.geometry",  # G-a
+    "OCP",  # G-a
 )
 #: Never loaded by importing the adapter ``velith.api.swe`` (stage E).
 ADAPTER_FORBIDDEN = ("velith.analysis", "statsmodels", "mini_prometheus", "miniflywire")
 #: Never imported by the contract sources; the adapter may import the harness and settings.
-CONTRACT_SOURCES = ("velith/api/__init__.py", "velith/api/contract.py")
+CONTRACT_SOURCES = (
+    "velith/api/__init__.py",
+    "velith/api/contract.py",
+    "velith/api/geometry_contract.py",
+)
 ALL_API_FORBIDDEN_IMPORTS = ("mini_prometheus", "miniflywire", "velith.analysis", "statsmodels")
-CONTRACT_FORBIDDEN_IMPORTS = (*ALL_API_FORBIDDEN_IMPORTS, "velith.harness", "velith.core")
+CONTRACT_FORBIDDEN_IMPORTS = (
+    *ALL_API_FORBIDDEN_IMPORTS,
+    "velith.harness",
+    "velith.core",
+    "velith.geometry",
+    "OCP",
+)
 
 EXPECTED_VECTOR_TESTS = 5
 
@@ -463,6 +491,97 @@ def run_vectors(python: str, tmp: Path) -> None:
     )
 
 
+# --- G-b / G-c. geometry extra ----------------------------------------------------------------
+
+GEOMETRY_PROBE = r"""
+import importlib.metadata, json, sysconfig
+import velith.geometry.verifier as verifier
+print(json.dumps({
+    "purelib": sysconfig.get_paths()["purelib"],
+    "verifier_file": verifier.__file__,
+    "binding_version": importlib.metadata.version("cadquery-ocp-novtk"),
+    "platform_support": verifier.platform_support(),
+}))
+"""
+
+
+def check_geometry_extra(python: str, tmp: Path, neutral: Path) -> None:
+    install = run(
+        [
+            python,
+            "-m",
+            "pip",
+            "install",
+            "--isolated",
+            "--no-cache-dir",
+            "--disable-pip-version-check",
+            "-q",
+            "--no-deps",
+            "--require-hashes",
+            "-r",
+            str(ROOT / "constraints" / "geometry-py312.txt"),
+        ],
+        cwd=neutral,
+        env=clean_env(),
+    )
+    require(install.returncode == 0, "G-b: the hash-pinned geometry extra installs", tail(install))
+    script = tmp / "geometry_probe.py"
+    script.write_text(GEOMETRY_PROBE, encoding="utf-8")
+    found = probe(python, script, [], neutral)
+    check(
+        under(found["verifier_file"], found["purelib"]),
+        "G-b: velith.geometry.verifier imports from the venv",
+        f"{found['verifier_file']}",
+    )
+    check(
+        found["binding_version"] == "8.0.1.1.0" and found["platform_support"] is None,
+        "G-b: the binding is the pinned 8.0.1.1.0 and the host is the identity platform",
+        f"{found['binding_version']} / {found['platform_support']}",
+    )
+    vec_root = tmp / "geometry_vectors"
+    vec_dir = vec_root / "tests" / "geometry"
+    shutil.copytree(
+        ROOT / "tests" / "geometry", vec_dir, ignore=shutil.ignore_patterns("__pycache__")
+    )
+    (vec_root / "tests" / "__init__.py").write_text("", encoding="utf-8")
+    (vec_root / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    junit = tmp / "geometry_vectors.xml"
+    proc = run(
+        [
+            python,
+            "-I",
+            "-m",
+            "pytest",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            "--rootdir",
+            str(vec_root),
+            "-c",
+            str(vec_root / "pytest.ini"),
+            f"--junitxml={junit}",
+            str(vec_dir / "test_vg_vectors.py"),
+        ],
+        cwd=vec_root,
+        env=clean_env(),
+    )
+    if not check(
+        junit.is_file(), "G-c: the geometry vector run produced a JUnit report", tail(proc)
+    ):
+        return
+    suite = ElementTree.parse(junit).getroot()
+    if suite.tag == "testsuites":
+        suite = suite[0]
+    counts = {k: int(suite.get(k, "-1")) for k in ("tests", "failures", "errors", "skipped")}
+    check(
+        proc.returncode == 0
+        and counts["tests"] > 0
+        and counts["failures"] == counts["errors"] == counts["skipped"] == 0,
+        "G-c: VG vectors pass against the installed wheel (none skipped, errored or failed)",
+        f"exit={proc.returncode} {counts} {tail(proc)}",
+    )
+
+
 # --- main ------------------------------------------------------------------------------------
 
 
@@ -551,6 +670,7 @@ def main() -> int:
             )
 
             run_vectors(python, tmp)
+            check_geometry_extra(python, tmp, neutral)
             check(list(neutral.iterdir()) == [], "nothing is written to the working directory")
     except GateAbortError as abort:
         # A required stage failed: it is already recorded; nothing after it is meaningful.
