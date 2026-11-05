@@ -59,6 +59,8 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D30 | Ecosystem Handbook v1.1 adopted as Velith's Layer-3 governance; M1–M9 frozen as historical research infrastructure | Accepted |
 | D31 | R-1 resolution: Stage-1 go/no-go realigned to D8.5 through a versioned M9/M10 Stage-1 successor | Accepted |
 | D33 | Engineering API v0 (API-0): software-only Layer-3 public contract | Accepted |
+| D34 | G0 exact-geometry conformance: a zero-model-gap capability separated from the M10/SFG gate | Ratified |
+| D35 | Component-scoped verifier versions (decouples `verifier.version` from `velith.__version__`) | Ratified |
 
 ---
 
@@ -881,6 +883,151 @@ ran (Law 16). A physical first result: closed by D5/D12/D31 (D30 open question).
   claims stay closed.
 - Implementation-time gates: repository reachability for the git-tag pins; Mini Prometheus Python
   3.12 compatibility (with its goldens re-verified) before RM6.
+
+---
+
+## D34 — Exact-geometry conformance (G0): a zero-model-gap physical capability, separated from the M10/SFG software-learning gate
+
+**Status:** RATIFIED (Gate 0 r2). **Date:** 2026-11-05.
+
+**Authority (on ratification):** project-owner ratification (Law 22) of the Research Director's Gate 0 recommendations (2026-11-04) and of CAP-0002 (Handbook v1.2, SHA-256 <SHA-256 of the ratified HANDBOOK_v1.2.md; draft text hashes to 88f0de63…a462 before the ratification-date placeholders are filled>).
+
+**Supersedes (scoped, named):**
+- **D5**: only the ordering consequence that *no* physical-domain capability may be built before the software rung's go/no-go. A single, closed, zero-model-gap capability (G0, scope below) is admitted ahead of the ladder. D5's ladder, its rungs and their order for **model-gap-introducing** capabilities are unchanged.
+- **D30, "Open question for the Director"**: answered, in part. A first physical engineering result for a machined part is authorized **only** for exact geometric conformance (G0). Any engineering *analysis* claim remains closed.
+
+**Does not supersede:**
+- D4 (the first vertical stays SWE);
+- D6–D8 (the compounding experiment and its conditions);
+- D12 (M0–M10 roadmap; M10 = Stage-1 go/no-go);
+- D29–D31 (identity v2, frozen M1–M9, Stage-1 successor);
+- D32;
+- D33 (API v0, which is extended, not changed: see items 6–7).
+
+**M10 and SFG continue independently** and are neither accelerated nor relaxed.
+
+### Evidence / flaw (amendment procedure)
+
+1. **The decision was open.** D30 recorded "first physical engineering result for one machined part" as an *open question requiring a decision that names D5 and D12*. P0 (2026-11-03) found it is the single item blocking every end-to-end manufacturing workflow (P0 §1 item 3, blocker B1).
+2. **The ladder's rationale does not cover G0.** D5's rationale is the **staged introduction of model-gap** ("first *deliberate* model-gap"; "progressively widening model-gaps"). Exact measurement of a given B-rep has **no physics model-gap**: it computes properties of the declared geometry itself. The Gate 0 evidence (G0-BENCH-01):
+   - volume error vs closed-form truth ≤ 2.1e-15 relative;
+   - bounding boxes exact;
+   - hole diameters exact;
+   - bit-identical results across two machines and across OCCT 7.9.3 / 8.0.1.
+   The ladder therefore does not need to govern G0. Only the blanket "nothing physical before M10" consequence blocks it.
+3. **The current gate is unbounded.** SFG is NOT READY (gates B–F open; `sfg_package` r5). Coupling a zero-gap capability to it makes the product schedule depend on a software-domain statistical result with no date. Nothing in D6–D8 requires that coupling.
+
+### Decision
+
+1. **Authorized scope (G0), exhaustive:**
+   - STEP / B-rep parsing;
+   - solid and topology validity;
+   - unit plausibility;
+   - exact geometric measurement within stated numerical tolerances;
+   - bounding-box verification;
+   - hole and feature measurement;
+   - conformance to **declared geometric requirements**;
+   - canonical, identity-bound `GeometryFacts`.
+2. **Explicitly excluded:**
+   - FEA;
+   - stress or thermal simulation;
+   - structural safety;
+   - material performance;
+   - GD&T or PMI interpretation (not implemented);
+   - generative or physical design;
+   - manufacturability, manufacturing safety or fitness-for-service claims.
+   A result never asserts that a part *works*, *is strong enough* or *can be made*.
+3. **Claim semantics.** `verified: true` for a G0 result means exactly one thing: *the submitted STEP artifact contains the declared number of valid closed solids whose exact measured geometry, computed by the pinned kernel on the identity-supported platform under the stated tolerances, conforms to the declared geometric requirements.*
+   - **PMI is disclosed, never evaluated (R-D34-1).** PMI and annotation entities present in the file (dimensional, tolerance, datum and presentation entities) are counted and disclosed in `GeometryFacts.annotations`, with `evaluated = "false"`. They are **never interpreted**, never checked against the declared requirements, and never used to infer requirements. A result whose annotation counts are non-zero still states nothing about those annotations. This adds no scope; GD&T stays excluded (item 2).
+4. **Model-gap honesty (Law 16).** G0 verdicts carry `confidence = 1.0` **only** for measurements on the exact B-rep. A tessellation-based quantity may appear only as a cross-check, never as a reported fact. Every tolerance is stated in the result's evidence.
+5. **Ownership.** Velith (Layer 3) owns the verifier, the kernel adapter and `GeometryFacts`, implementing Noetica's existing `Verifier` and `Provenance` contracts with **no Noetica change**. Mini Prometheus consumes the facts as data and never parses CAD.
+6. **API.** Published as Engineering API **v0.2** (spec F). The v0.1 wire object, identity v1, the vectors T1–T5b and the software verification rule are unchanged.
+7. **Isolation.** The CAD kernel is an optional extra and never a dependency of `velith.api` or of the software verifier.
+8. **Identity-supported platform: temporary (Director qualification 1).** G0 results are identity-comparable only when produced on **linux/x86_64, with the pinned manylinux wheel, inside the Velith verifier image**.
+   - **Temporary.** This restriction lasts only until the frozen VG vector set reproduces bit-for-bit on another platform. Lifting it, for that platform only, is a recorded decision.
+   - **Recorded in provenance.** The platform and the restriction policy are recorded in `GeometryFacts.measurement` next to the kernel, binding and quantization versions (API v0.2 r3 §2). They are part of the facts identity.
+   - **Elsewhere, no result.** On any other platform the verifier refuses to produce a result (`GeometryExecutionError(PLATFORM_UNSUPPORTED)`). It never produces an unflagged one.
+9. **Abnormal worker exit (Director qualification 2).**
+   - **Isolation.** Geometry measurement runs in an isolated worker process.
+   - **Outcome.** Any abnormal worker exit gives **no result, no `UnverifiedOutcome`, and therefore no positive manufacturing outcome**. Abnormal exits are: timeout, CPU-limit, memory-limit, output-limit, a signal, a non-zero exit, or malformed worker output.
+   - **The parent survives.** It classifies the exit (API v0.2 r3 §6) and retains a bounded diagnostic record.
+   - **Mini Prometheus must not proceed.** Without a verified geometry result, it cannot produce a `velith_verified` plan.
+   - **Limits.** The worker runs under CPU, memory, file-size and wall-time limits.
+   - **Deployment gate.** A **container plus seccomp** profile is **mandatory before any networked or multi-tenant deployment**. That deployment is outside G0's scope; this item records the gate.
+10. **Benchmark.** G0 acceptance is measured on the frozen `G0-BENCH-01` (Tier 1) plus NIST Tier 2 cases (deliverable D). Implementation starts only after the spec and benchmark are frozen.
+
+### Rationale
+
+This is the smallest decision that unblocks the physical path. It keeps the scientific programme intact:
+- the compounding hypothesis and every M-sequence identity are untouched;
+- the ladder still governs model-gap;
+- the new capability is the one class of physical verification whose ground truth is exact.
+
+### Alternatives rejected
+
+| Alternative | Reason |
+|---|---|
+| Wait for M10 (honour D5 as written) | No date; SFG not ready; blocks the product indefinitely |
+| An interpretive ruling with no Handbook change | §7.7 and §13.6 name "mechanical" as rung 4 and forbid attempting a rung early. Reading G0 out of "mechanical" by interpretation is the kind of quiet change Law 23 forbids (see B) |
+| Put geometry in Mini Prometheus | Violates the Handbook ownership (CAD is Velith) and MP's "never parse the artifact" |
+| Open the full mechanical rung (FEA) | Introduces model-gap; contradicts D5's purpose |
+
+### Consequences
+
+- r2 adds no scope: items 8–9 restrict and harden; item 3's disclosure counts entities without interpreting them.
+- New code is confined to `src/velith/geometry/` and additive `velith.api` contract types (spec F §7).
+- Frozen M1–M9 and API v0.1 files stay byte-unchanged.
+- Velith version `0.2.0`. A new runtime dependency, `cadquery-ocp-novtk==8.0.1.1.0`, is optional (extra `geometry`).
+- Velith `PROJECT_STATE.md`, README and ROADMAP are updated at G0 close only.
+- **Kill criterion.** If G0 cannot meet its acceptance criteria on Tier 2 (non-OCCT-authored) parts, G0 stops and a new decision is required. Scope is never widened to compensate.
+
+---
+
+## D35 — Component-scoped verifier versions
+
+**Status:** RATIFIED (r2). **Date:** 2026-11-05. **Authority:** project-owner ratification (Law 22).
+
+**Supersedes (scoped, named):**
+- `docs/API_V0_SPEC.md` §8 C2 K5 and §8 C3 *Consequences*: the rule that the wire `verifier.version` is `velith.__version__`.
+- §3.5's sentence "Identical patch, task and Velith version give an identical identity", which becomes "… and verifier component version …".
+
+**Does not supersede:** D33 items 1–8, identity v1, T1–T5b, or any M1–M9 component.
+
+### Evidence / flaw (amendment procedure) — unchanged from r1
+
+Isolated experiment, 2026-11-04, on clean copies of `aadceeb`, with a real sandbox run of `calc_add_bug`. Files: `gate0/ratification/evidence_d3/`.
+
+| Variant | Package version | Wire `verifier.version` | Correct-patch `content_hash` | Matches v0.1 vector T4-B? | Tests |
+|---|---|---|---|---|---|
+| Coupled (as ratified) | 0.2.0 | 0.2.0 | `sha256:88bb7115…f438` | **No** | 878 passed (the churn is undetected) |
+| Decoupled | 0.2.0 | 0.1.0 | `sha256:6c2babe9…17a0` | **Yes** | 877 passed, 1 failed: `test_identity_is_the_swe_component_at_the_running_version` (encodes the superseded rule) |
+
+Re-confirmed on 2026-11-04 (r2): `tests/unit/test_api_vectors.py`, `test_api_contract.py` and `tests/integration/test_api_swe_result.py` give **74 passed, 0 skipped** at `aadceeb`.
+
+### Decision
+
+1. **Component version on the wire.** The wire `verifier.version` is the **component** version: a constant per verifier component, `SWE_VERIFIER_VERSION = "0.1.0"` and `GEOMETRY_VERIFIER_VERSION = "0.2.0"` (initial).
+2. **When a component version changes.** If and only if that component's verification rule, evidence semantics or identity view changes.
+3. **Geometry verifier bump triggers (R-D35-1).** `GEOMETRY_VERIFIER_VERSION` **must** change on any change to:
+   - (a) the kernel or binding pin (`cadquery-ocp-novtk` / OCCT version);
+   - (b) the quantization rule or quanta (API v0.2 §2, vector set VG-0);
+   - (c) the hole-recognition rule;
+   - (d) the annotation-disclosure entity list;
+   - (e) the verification rule or reason precedence (§5);
+   - (f) the identity-supported-platform policy, including lifting the temporary x86_64 restriction for a platform.
+
+   Each of these is a behaviour change by definition, even when no test output changes.
+4. **CI pin.** A test pins the tuple (`GEOMETRY_VERIFIER_VERSION`, kernel version, binding version, quantization-rule id, platform-policy id). Changing any member without bumping the version fails CI.
+5. **Package version stays local.** `velith.__version__` remains recorded in local provenance (`attributes.velith_version`), outside the identity.
+6. **No compatibility matrix.** A global version-compatibility matrix is **not** introduced. Every v0.2 result carries exactly one verifier, and no verifier consumes another verifier's output. This is reconsidered only if chained verifiers are ever proposed.
+
+### Consequences
+
+- `test_identity_is_the_swe_component_at_the_running_version` is replaced by a test asserting `SWE_VERIFIER_VERSION`.
+- A new container regression test asserts that a real run reproduces T4-B/T5b while `velith.__version__ != "0.1.0"`.
+- `tools/api_v0_demo.py` `RELEASE_VERSION` checks the component version.
+- The new CI pin test (item 4).
+- Existing records are unaffected; no record is rewritten.
 
 ---
 
