@@ -59,8 +59,8 @@ The narrative sections requested (vision, vertical, philosophy, migration, non-g
 | D30 | Ecosystem Handbook v1.1 adopted as Velith's Layer-3 governance; M1–M9 frozen as historical research infrastructure | Accepted |
 | D31 | R-1 resolution: Stage-1 go/no-go realigned to D8.5 through a versioned M9/M10 Stage-1 successor | Accepted |
 | D33 | Engineering API v0 (API-0): software-only Layer-3 public contract | Accepted |
-| D34 | G0 exact-geometry conformance: a zero-model-gap capability separated from the M10/SFG gate | Ratified |
-| D35 | Component-scoped verifier versions (decouples `verifier.version` from `velith.__version__`) | Ratified |
+| D34 | G0 exact-geometry conformance: a zero-model-gap capability separated from the M10/SFG gate | Proposed |
+| D35 | Component-scoped verifier versions (decouples `verifier.version` from `velith.__version__`) | Proposed |
 
 ---
 
